@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>センサー使用＋カメラ起動</title>
+  <title>背面カメラ + A-Frame 3D</title>
 
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
@@ -43,7 +43,7 @@
     a-scene {
       width: 100vw;
       height: 100vh;
-      display: none;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -52,8 +52,9 @@
   <video id="videoBackground" autoplay muted playsinline></video>
   <button id="startButton">スタート</button>
 
-  <a-scene embedded id="arScene">
+  <a-scene embedded>
     <a-assets></a-assets>
+
     <a-camera position="0 1.6 0"></a-camera>
     <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
   </a-scene>
@@ -62,49 +63,43 @@
     const video = document.getElementById('videoBackground');
     const startButton = document.getElementById('startButton');
     const box = document.getElementById('blueBox');
-    const scene = document.getElementById('arScene');
+    const scene = document.querySelector('a-scene');
 
     async function requestMotionPermission() {
-      if (typeof DeviceMotionEvent !== "undefined" &&
-          typeof DeviceMotionEvent.requestPermission === "function") {
-        try {
-          const response = await DeviceMotionEvent.requestPermission();
-          if (response !== "granted") throw new Error("センサーの許可が拒否されました");
-        } catch (err) {
-          alert("センサーの許可が必要です: " + err.message);
-          throw err;
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        const result = await DeviceMotionEvent.requestPermission();
+        if (result !== 'granted') {
+          throw new Error("センサーの使用が許可されていません");
         }
       }
     }
 
     startButton.addEventListener('click', async () => {
       try {
-        // iOS のセンサー許可をリクエスト
+        // モーションセンサーの許可をリクエスト
         await requestMotionPermission();
 
-        // 背面カメラを起動（失敗時は前面カメラにフォールバック）
-        let stream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { exact: "environment" } }
-          });
-        } catch {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user" }
-          });
-        }
-
+        // カメラ許可リクエスト（背面カメラ）
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
         video.srcObject = stream;
-        video.style.display = 'block';
-        scene.style.display = 'block';
-        box.setAttribute('visible', 'true');
-        startButton.style.display = 'none';
+
+        // カメラ映像のメタデータが読み込まれた後に処理を実行
+        video.onloadedmetadata = () => {
+          video.play();
+          video.style.display = 'block';
+          box.setAttribute('visible', 'true');  // キューブ表示
+          startButton.style.display = 'none';   // ボタン非表示
+        };
 
       } catch (err) {
-        alert("カメラまたはセンサーの起動に失敗しました。\n" + err.message);
-        console.error(err);
+        console.warn("カメラアクセスエラー:", err);
+        alert("カメラアクセスに失敗しました。設定を確認してください。");
       }
     });
   </script>
+
 </body>
 </html>
