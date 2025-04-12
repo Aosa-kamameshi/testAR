@@ -3,52 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>カメラプレビュー ARなし</title>
+  <title>リアルタイムカメラ + 3D（スタート式）</title>
 
   <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
   <style>
-    body {
+    body, html {
       margin: 0;
+      padding: 0;
+      overflow: hidden;
       font-family: sans-serif;
-      background: #000;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
     }
 
-    h1 {
-      margin: 1rem 0 0.5rem;
-      text-align: center;
+    #videoBackground {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: -1;
+      display: none;
+    }
+
+    #startButton {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      background-color: #2196f3;
+      color: white;
+      cursor: pointer;
+      z-index: 2;
     }
 
     a-scene {
       width: 100vw;
-      height: 60vh;
-    }
-
-    @media (max-width: 600px) {
-      a-scene {
-        height: 50vh;
-      }
+      height: 100vh;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
 
-  <h1>カメラビュー（ARなし）</h1>
+  <!-- 背景に使うカメラ映像 -->
+  <video id="videoBackground" autoplay muted playsinline></video>
+
+  <!-- スタートボタン -->
+  <button id="startButton">スタート</button>
 
   <!-- A-Frameシーン -->
-  <a-scene embedded color-space="sRGB">
+  <a-scene embedded>
     <a-assets></a-assets>
 
     <a-camera position="0 1.6 0"></a-camera>
 
-    <!-- 常に表示される青いキューブ -->
-    <a-box position="0 1 -3" material="color: blue;"></a-box>
+    <!-- ボタンで表示されるキューブ -->
+    <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
   </a-scene>
+
+  <script>
+    const video = document.getElementById('videoBackground');
+    const startButton = document.getElementById('startButton');
+    const box = document.getElementById('blueBox');
+
+    startButton.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        video.style.display = 'block';       // カメラ映像を表示
+        box.setAttribute('visible', 'true'); // キューブ表示
+        startButton.style.display = 'none';  // ボタン非表示
+      } catch (err) {
+        alert('カメラのアクセスが拒否されました');
+        console.error(err);
+      }
+    });
+  </script>
 
 </body>
 </html>
