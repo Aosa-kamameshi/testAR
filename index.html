@@ -3,12 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>背面カメラ + A-Frame 3D</title>
+  <title>センサー使用＋カメラ起動</title>
 
-  <!-- iOS対応のメタタグ -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-
-  <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
   <style>
@@ -44,69 +40,71 @@
       z-index: 2;
     }
 
-    #arScene {
-      display: none;
-      pointer-events: none;
+    a-scene {
       width: 100vw;
       height: 100vh;
+      display: none;
     }
   </style>
 </head>
 <body>
 
-  <!-- カメラ映像 -->
   <video id="videoBackground" autoplay muted playsinline></video>
-
-  <!-- スタートボタン -->
   <button id="startButton">スタート</button>
 
-  <!-- A-Frameシーン -->
-  <a-scene id="arScene" embedded>
+  <a-scene embedded id="arScene">
     <a-assets></a-assets>
     <a-camera position="0 1.6 0"></a-camera>
-    <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="true"></a-box>
+    <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
   </a-scene>
 
   <script>
     const video = document.getElementById('videoBackground');
     const startButton = document.getElementById('startButton');
-    const arScene = document.getElementById('arScene');
+    const box = document.getElementById('blueBox');
+    const scene = document.getElementById('arScene');
 
-    startButton.addEventListener('click', async () => {
-      // iOS：モーションセンサーの許可を要求
-      if (typeof DeviceOrientationEvent !== "undefined" &&
-          typeof DeviceOrientationEvent.requestPermission === "function") {
+    async function requestMotionPermission() {
+      if (typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function") {
         try {
-          const response = await DeviceOrientationEvent.requestPermission();
-          if (response !== "granted") {
-            alert("モーションセンサーの使用を許可してください。");
-            return;
-          }
+          const response = await DeviceMotionEvent.requestPermission();
+          if (response !== "granted") throw new Error("センサーの許可が拒否されました");
         } catch (err) {
-          alert("センサーの許可に失敗しました。設定をご確認ください。");
-          return;
+          alert("センサーの許可が必要です: " + err.message);
+          throw err;
         }
       }
+    }
 
-      // カメラ起動（背面優先）
+    startButton.addEventListener('click', async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        console.warn("背面カメラが使えません、前面カメラに切り替えます。", err);
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" }
-        });
-        video.srcObject = fallbackStream;
-      }
+        // iOS のセンサー許可をリクエスト
+        await requestMotionPermission();
 
-      video.style.display = 'block';
-      arScene.style.display = 'block';
-      startButton.style.display = 'none';
+        // 背面カメラを起動（失敗時は前面カメラにフォールバック）
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } }
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" }
+          });
+        }
+
+        video.srcObject = stream;
+        video.style.display = 'block';
+        scene.style.display = 'block';
+        box.setAttribute('visible', 'true');
+        startButton.style.display = 'none';
+
+      } catch (err) {
+        alert("カメラまたはセンサーの起動に失敗しました。\n" + err.message);
+        console.error(err);
+      }
     });
   </script>
-
 </body>
 </html>
