@@ -72,12 +72,15 @@
   >
     <a-assets></a-assets>
 
+    <!-- カメラ -->
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- マーカー認識時に表示される青いキューブ -->
+    <!-- ターゲットを認識したときに表示される3Dオブジェクト -->
     <a-entity mindar-image-target="targetIndex: 0">
       <a-box position="0 0.1 0" material="color: blue;"></a-box>
     </a-entity>
+
+    <!-- 必要に応じて他の3Dオブジェクトを追加 -->
   </a-scene>
 
   <!-- ボタン -->
@@ -99,7 +102,6 @@
 
       try {
         await navigator.mediaDevices.getUserMedia({ video: true }); // 許可要求
-
         await sceneEl.components["mindar-image"].start(); // AR開始
         arStarted = true;
         console.log("AR開始");
