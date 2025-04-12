@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>カメラプレビュー AR</title>
+  <title>カメラプレビュー ARなし</title>
 
-  <!-- A-Frame + MindAR -->
+  <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
     body {
@@ -25,22 +24,6 @@
       text-align: center;
     }
 
-    #buttonArea {
-      margin-top: 10px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    button {
-      padding: 10px 20px;
-      font-size: 1rem;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-    }
-
     a-scene {
       width: 100vw;
       height: 60vh;
@@ -50,126 +33,22 @@
       a-scene {
         height: 50vh;
       }
-
-      button {
-        font-size: 0.9rem;
-        padding: 8px 16px;
-      }
-    }
-
-    /* モーダルスタイル */
-    #popup {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 80%;
-      text-align: center;
-    }
-
-    #popup button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      font-size: 1rem;
-      background: #fff;
-      color: #000;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-  <h1>カメラプレビュー</h1>
+  <h1>カメラビュー（ARなし）</h1>
 
-  <!-- MindARシーン -->
-  <a-scene
-    mindar-image="imageTargetSrc: ./neco.mind; autoStart: false;"
-    embedded
-    color-space="sRGB"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: true"
-  >
+  <!-- A-Frameシーン -->
+  <a-scene embedded color-space="sRGB">
     <a-assets></a-assets>
 
-    <!-- カメラ -->
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-camera position="0 1.6 0"></a-camera>
 
-    <!-- ターゲットを認識したときに表示される3Dオブジェクト -->
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-box position="0 0.1 0" material="color: blue;"></a-box>
-    </a-entity>
+    <!-- 常に表示される青いキューブ -->
+    <a-box position="0 1 -3" material="color: blue;"></a-box>
   </a-scene>
 
-  <!-- ボタン -->
-  <div id="buttonArea">
-    <button id="startButton">カメラ ON</button>
-    <button id="stopButton">AR OFF</button>
-  </div>
-
-  <!-- カスタムポップアップ -->
-  <div id="popup">
-    <p id="popupMessage"></p>
-    <button onclick="closePopup()">閉じる</button>
-  </div>
-
-  <script>
-    const sceneEl = document.querySelector("a-scene");
-    const startButton = document.getElementById("startButton");
-    const stopButton = document.getElementById("stopButton");
-    const popup = document.getElementById("popup");
-    const popupMessage = document.getElementById("popupMessage");
-
-    let arStarted = false;
-
-    function showPopup(message) {
-      popupMessage.textContent = message;
-      popup.style.display = "block";
-    }
-
-    function closePopup() {
-      popup.style.display = "none";
-    }
-
-    // カメラ開始とAR開始
-    startButton.addEventListener("click", async () => {
-      if (arStarted) return;
-
-      try {
-        showPopup("カメラ許可をリクエスト中...");
-        await navigator.mediaDevices.getUserMedia({ video: true }); // 許可要求
-        showPopup("カメラ許可成功");
-
-        const mindarComponent = sceneEl.components["mindar-image"];
-        if (mindarComponent) {
-          showPopup("ARコンポーネント開始");
-          await mindarComponent.start(); 
-          arStarted = true;
-          startButton.style.display = "none"; 
-          stopButton.style.display = "block"; 
-          showPopup("AR開始");
-        } else {
-          showPopup("ARコンポーネントがロードされていません");
-        }
-      } catch (e) {
-        showPopup("エラー: " + e.message); // エラーメッセージをポップアップ表示
-      }
-    });
-
-    // AR停止
-    stopButton.addEventListener("click", () => {
-      if (arStarted) {
-        sceneEl.components["mindar-image"].stop();
-        arStarted = false;
-        showPopup("AR停止");
-      }
-    });
-  </script>
 </body>
 </html>
