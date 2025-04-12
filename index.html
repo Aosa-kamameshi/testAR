@@ -1,108 +1,121 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>カメラプレビュー & AR</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>カメラプレビュー AR</title>
+
+  <!-- A-Frame + MindAR -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+
   <style>
     body {
       margin: 0;
       font-family: sans-serif;
-      overflow: hidden;
       background: #000;
-    }
-    h1 {
-      text-align: center;
       color: white;
-      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    #scene-container {
-      position: relative;
-      width: 100vw;
-      height: 70vh;
-    }
-    #controls {
+
+    h1 {
+      margin: 1rem 0 0.5rem;
       text-align: center;
-      margin-top: 10px;
     }
+
+    #buttonArea {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
     button {
-      margin: 5px;
       padding: 10px 20px;
-      font-size: 16px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    a-scene {
+      width: 100vw;
+      height: 60vh;
+    }
+
+    @media (max-width: 600px) {
+      a-scene {
+        height: 50vh;
+      }
+
+      button {
+        font-size: 0.9rem;
+        padding: 8px 16px;
+      }
     }
   </style>
 </head>
 <body>
+
   <h1>カメラプレビュー</h1>
 
-  <div id="scene-container">
-    <a-scene id="ar-scene"
-      mindar-image="imageTargetSrc: './targets.mind'; autoStart: false;"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: true"
-      embedded
-      playsinline
-      style="width: 100%; height: 100%;">
-      
-      <a-assets></a-assets>
+  <!-- MindARシーン -->
+  <a-scene
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;"
+    embedded
+    color-space="sRGB"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: true"
+  >
+    <a-assets></a-assets>
 
-      <a-camera mindar-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <a-entity id="ar-overlay" mindar-image-target="targetIndex: 0" visible="false">
-        <a-box position="0 0.1 0" scale="0.5 0.5 0.5" material="color: blue;"></a-box>
-        <a-box position="0 0 0" scale="1.2 1.2 0.01" material="color: red; opacity: 0.5;"></a-box>
-      </a-entity>
-    </a-scene>
-  </div>
+    <!-- マーカー認識時に表示される青いキューブ -->
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-box position="0 0.1 0" material="color: blue;"></a-box>
+    </a-entity>
+  </a-scene>
 
-  <div id="controls">
-    <button id="cameraToggle">カメラ ON</button>
-    <button id="arToggle">AR ON</button>
+  <!-- ボタン -->
+  <div id="buttonArea">
+    <button id="startButton">カメラ ON</button>
+    <button id="stopButton">AR OFF</button>
   </div>
 
   <script>
-    const sceneEl = document.querySelector('#ar-scene');
-    const cameraToggle = document.getElementById('cameraToggle');
-    const arToggle = document.getElementById('arToggle');
-    const arOverlay = document.getElementById('ar-overlay');
+    const sceneEl = document.querySelector("a-scene");
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
 
-    let cameraOn = false;
-    let arOn = false;
+    let arStarted = false;
 
-    async function startCamera() {
+    // カメラ開始とAR開始
+    startButton.addEventListener("click", async () => {
+      if (arStarted) return;
+
       try {
-        await sceneEl.components['mindar-image'].start();
-        cameraOn = true;
-        cameraToggle.textContent = 'カメラ OFF';
-        console.log('カメラ起動');
-      } catch (error) {
-        console.error('カメラ起動エラー:', error);
-        alert('カメラを起動できませんでした。');
-      }
-    }
+        await navigator.mediaDevices.getUserMedia({ video: true }); // 許可要求
 
-    function stopCamera() {
-      sceneEl.components['mindar-image'].stop();
-      cameraOn = false;
-      cameraToggle.textContent = 'カメラ ON';
-      console.log('カメラ停止');
-    }
-
-    cameraToggle.addEventListener('click', () => {
-      if (cameraOn) {
-        stopCamera();
-      } else {
-        startCamera();
+        await sceneEl.components["mindar-image"].start(); // AR開始
+        arStarted = true;
+        console.log("AR開始");
+      } catch (e) {
+        console.error("カメラ許可が必要です:", e);
+        alert("カメラへのアクセスを許可してください。");
       }
     });
 
-    arToggle.addEventListener('click', () => {
-      arOn = !arOn;
-      arOverlay.setAttribute('visible', arOn.toString());
-      arToggle.textContent = arOn ? 'AR OFF' : 'AR ON';
-      console.log(`AR ${arOn ? '表示' : '非表示'}`);
+    // AR停止
+    stopButton.addEventListener("click", () => {
+      if (arStarted) {
+        sceneEl.components["mindar-image"].stop();
+        arStarted = false;
+        console.log("AR停止");
+      }
     });
   </script>
 </body>
