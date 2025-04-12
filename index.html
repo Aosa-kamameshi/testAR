@@ -60,29 +60,25 @@
   </a-scene>
 
   <script>
-    window.onload = () => {
-      const video = document.getElementById('videoBackground');
-      const startButton = document.getElementById('startButton');
-      const box = document.getElementById('blueBox');
+    document.getElementById('startButton').addEventListener('click', async () => {
+      try {
+        // カメラ許可リクエスト（背面カメラ）
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
 
-      startButton.addEventListener('click', async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { exact: "environment" } }
-          });
-          video.srcObject = stream;
-        } catch (err) {
-          const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user" }
-          });
-          video.srcObject = fallbackStream;
-        }
+        const video = document.getElementById('videoBackground');
+        video.srcObject = stream;
 
+        // カメラが正常に動作している場合
         video.style.display = 'block';
-        box.setAttribute('visible', 'true');
-        startButton.style.display = 'none';
-      });
-    };
+        document.getElementById('blueBox').setAttribute('visible', 'true');
+        document.getElementById('startButton').style.display = 'none';
+      } catch (err) {
+        console.error("カメラアクセスエラー:", err);
+        alert("カメラが利用できません。設定を確認してください。");
+      }
+    });
   </script>
 
 </body>
