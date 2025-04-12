@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>WebAR カメラプレビュー</title>
 
-  <!-- 必要なライブラリ -->
+  <!-- ライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    body { margin: 0; overflow: hidden; font-family: sans-serif; background: black; }
     #startButton {
       position: absolute;
       z-index: 10;
@@ -24,14 +24,19 @@
       border: none;
       border-radius: 10px;
     }
+    a-scene {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    a-scene.started {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
 
-  <!-- スタートボタン（iOS対策） -->
   <button id="startButton">AR開始</button>
 
-  <!-- ARシーン -->
   <a-scene
     mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;"
     vr-mode-ui="enabled: false"
@@ -39,19 +44,14 @@
     embedded
     renderer="colorManagement: true;"
     id="ar-scene"
-    style="width: 100vw; height: 100vh; display: none;"
+    class=""
   >
-    <a-assets>
-      <!-- 必要ならモデル読み込み -->
-    </a-assets>
+    <a-assets></a-assets>
 
-    <!-- カメラ -->
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-    <!-- ターゲット画像に反応して表示される青いキューブ -->
+    <a-camera position="0 0 0" look-controls="enabled: false" />
+    
     <a-entity mindar-image-target="targetIndex: 0">
       <a-box position="0 0.1 0" depth="0.1" height="0.2" width="0.2" color="#4CC3D9"></a-box>
-      <!-- 認識エリアの赤い枠（やや大きめ） -->
       <a-ring position="0 0 0" rotation="-90 0 0" radius-inner="0.3" radius-outer="0.32" color="red"></a-ring>
     </a-entity>
   </a-scene>
@@ -61,11 +61,15 @@
     const sceneEl = document.getElementById('ar-scene');
 
     startButton.addEventListener('click', async () => {
-      // iOS対策：ユーザー操作で起動
       startButton.style.display = 'none';
-      sceneEl.style.display = 'block';
-      await sceneEl.components['mindar-image'].start();
-      console.log("AR開始");
+      sceneEl.classList.add('started');
+      try {
+        await sceneEl.components['mindar-image'].start();
+        console.log("AR開始成功");
+      } catch (e) {
+        console.error("AR開始エラー", e);
+        alert("カメラの起動に失敗しました。Safariの設定を確認してください。");
+      }
     });
   </script>
 
