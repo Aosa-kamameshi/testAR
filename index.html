@@ -3,69 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAR カメラプレビュー</title>
+  <title>カメラプレビュー & AR切り替え</title>
 
-  <!-- ライブラリ -->
+  <!-- A-Frame & MindARライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    #stopButton {
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    #cameraPreview {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+    #ar-scene {
+      display: none;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    #controls {
       position: absolute;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 10;
-      padding: 12px 24px;
-      font-size: 16px;
+      z-index: 2;
+      display: flex;
+      gap: 10px;
     }
-    h1 {
-      position: absolute;
-      top: 10px;
-      width: 100%;
-      text-align: center;
-      color: white;
-      z-index: 10;
-      text-shadow: 1px 1px 4px black;
+    button {
+      font-size: 16px;
+      padding: 8px 16px;
     }
   </style>
 </head>
 <body>
-  <h1>カメラプレビュー</h1>
-  <button id="stopButton">カメラ停止</button>
+  <h1 style="position: absolute; top: 10px; left: 10px; z-index: 2;">カメラプレビュー</h1>
 
-  <!-- A-Frame + MindARのシーン -->
-  <a-scene mindar-image="imageTargetSrc: './targets.mind'; autoStart: true;" 
+  <!-- videoタグでリアルタイムカメラ映像 -->
+  <video id="cameraPreview" autoplay playsinline muted></video>
+
+  <!-- ARシーン（MindAR） -->
+  <a-scene id="ar-scene"
+           mindar-image="imageTargetSrc: ./target.mind; autoStart: false;"
            embedded
-           vr-mode-ui="enabled: false" 
+           vr-mode-ui="enabled: false"
            device-orientation-permission-ui="enabled: true">
-
-    <a-assets></a-assets>
+    
+    <a-assets>
+      <a-asset-item id="model" src="path_to_model.glb"></a-asset-item>
+    </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- 認識されたときに表示される要素 -->
     <a-entity mindar-image-target="targetIndex: 0">
-      <!-- 赤枠（認識領域の目安） -->
-      <a-box position="0 0 0" scale="1 1 0.01" material="color: red; opacity: 0.3;"></a-box>
-      
-      <!-- 青いキューブ（表示したいオブジェクト） -->
-      <a-box position="0 0.5 0" color="#0000FF" depth="0.3" height="0.3" width="0.3"></a-box>
+      <a-entity gltf-model="#model" position="0 0.1 0" scale="0.2 0.2 0.2"></a-entity>
+      <a-box position="0 0 0" scale="1.2 1.2 0.1" material="color: red; opacity: 0.3;"></a-box>
     </a-entity>
   </a-scene>
 
-  <script>
-    const sceneEl = document.querySelector('a-scene');
-    const stopButton = document.getElementById('stopButton');
+  <!-- ボタン操作エリア -->
+  <div id="controls">
+    <button id="startAR">AR開始</button>
+    <button id="stopAR">AR停止</button>
+  </div>
 
-    stopButton.addEventListener('click', () => {
-      const mindarComponent = sceneEl.components['mindar-image'];
-      if (mindarComponent) {
-        mindarComponent.stop();
-        console.log("カメラ停止");
+  <script>
+    const video = document.getElementById('cameraPreview');
+    const sceneEl = document.querySelector('a-scene');
+    const startBtn = document.getElementById('startAR');
+    const stopBtn = document.getElementById('stopAR');
+
+    let videoStream;
+
+    // 通常のカメラプレビューを開始
+    async function startCameraPreview() {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = videoStream;
+      } catch (err) {
+        console.error("カメラの取得に失敗しました:", err);
+        alert("カメラにアクセスできませんでした。許可を確認してください。");
       }
+    }
+
+    // カメラプレビュー停止
+    function stopCameraPreview() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+    }
+
+    // AR開始処理
+    startBtn.addEventListener('click', async () => {
+      video.style.display = 'none';
+      document.getElementById('ar-scene').style.display = 'block';
+      stopCameraPreview();
+
+      await sceneEl.components['mindar-image'].start();
+      console.log("AR開始");
     });
+
+    // AR停止処理
+    stopBtn.addEventListener('click', () => {
+      sceneEl.components['mindar-image'].stop();
+      document.getElementById('ar-scene').style.display = 'none';
+      video.style.display = 'block';
+      startCameraPreview();
+      console.log("AR停止 → カメラプレビュー再開");
+    });
+
+    // ページロード時にカメラプレビュー開始
+    window.addEventListener('load', startCameraPreview);
   </script>
 </body>
 </html>
