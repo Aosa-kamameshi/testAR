@@ -3,75 +3,74 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>WebAR カメラプレビュー</title>
+  <title>MindAR カメラプレビュー</title>
 
   <!-- ライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; background: black; }
-    #startButton {
+    body { margin: 0; overflow: hidden; }
+    h1 {
       position: absolute;
-      z-index: 10;
-      top: 50%;
+      top: 10px;
       left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 1em 2em;
-      font-size: 1.2em;
-      background: #007aff;
+      transform: translateX(-50%);
+      z-index: 1000;
       color: white;
-      border: none;
-      border-radius: 10px;
+      font-family: sans-serif;
     }
-    a-scene {
-      opacity: 0;
-      transition: opacity 0.5s ease;
+    #startButton, #stopButton {
+      position: absolute;
+      left: 10px;
+      z-index: 999;
     }
-    a-scene.started {
-      opacity: 1;
-    }
+    #startButton { top: 50px; }
+    #stopButton { top: 90px; }
   </style>
 </head>
 <body>
+  <h1>カメラプレビュー</h1>
+  <button id="startButton">カメラ開始</button>
+  <button id="stopButton">カメラ停止</button>
 
-  <button id="startButton">AR開始</button>
-
-  <a-scene
-    mindar-image="imageTargetSrc: ./targets.mind; autoStart: false;"
+  <a-scene 
+    mindar-image="imageTargetSrc: './target.mind'; autoStart: false; uiScanning: false; uiLoading: false; uiError: false"
+    embedded
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: true"
-    embedded
-    renderer="colorManagement: true;"
-    id="ar-scene"
-    class=""
+    playsinline
   >
-    <a-assets></a-assets>
+    <a-assets>
+      <a-asset-item id="model" src="path_to_model.glb"></a-asset-item>
+    </a-assets>
 
-    <a-camera position="0 0 0" look-controls="enabled: false" />
-    
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
     <a-entity mindar-image-target="targetIndex: 0">
-      <a-box position="0 0.1 0" depth="0.1" height="0.2" width="0.2" color="#4CC3D9"></a-box>
-      <a-ring position="0 0 0" rotation="-90 0 0" radius-inner="0.3" radius-outer="0.32" color="red"></a-ring>
+      <a-entity gltf-model="#model" position="0 0.1 0"></a-entity>
+      <a-box position="0 0 0" scale="1.2 1.2 0.1" material="color: #FF0000; opacity: 0.5;"></a-box>
     </a-entity>
   </a-scene>
 
   <script>
-    const startButton = document.getElementById('startButton');
-    const sceneEl = document.getElementById('ar-scene');
+    const sceneEl = document.querySelector('a-scene');
 
-    startButton.addEventListener('click', async () => {
-      startButton.style.display = 'none';
-      sceneEl.classList.add('started');
-      try {
-        await sceneEl.components['mindar-image'].start();
-        console.log("AR開始成功");
-      } catch (e) {
-        console.error("AR開始エラー", e);
-        alert("カメラの起動に失敗しました。Safariの設定を確認してください。");
+    document.getElementById('startButton').addEventListener('click', () => {
+      const mindarComponent = sceneEl.components['mindar-image'];
+      if (mindarComponent) {
+        mindarComponent.start();
+        console.log("MindARのカメラ開始");
+      }
+    });
+
+    document.getElementById('stopButton').addEventListener('click', () => {
+      const mindarComponent = sceneEl.components['mindar-image'];
+      if (mindarComponent) {
+        mindarComponent.stop();
+        console.log("MindARのカメラ停止");
       }
     });
   </script>
-
 </body>
 </html>
