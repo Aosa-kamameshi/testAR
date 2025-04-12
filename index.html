@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>リアルタイムカメラ + 3D（スタート式）</title>
+  <title>背面カメラ + A-Frame 3D</title>
 
   <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
@@ -73,15 +73,23 @@
 
     startButton.addEventListener('click', async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // 背面カメラをリクエスト
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
         video.srcObject = stream;
-        video.style.display = 'block';       // カメラ映像を表示
-        box.setAttribute('visible', 'true'); // キューブ表示
-        startButton.style.display = 'none';  // ボタン非表示
       } catch (err) {
-        alert('カメラのアクセスが拒否されました');
-        console.error(err);
+        console.warn("背面カメラが使えないため、前面カメラを使用します。", err);
+        // フォールバック：前面カメラ
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" }
+        });
+        video.srcObject = fallbackStream;
       }
+
+      video.style.display = 'block';       // カメラ映像を表示
+      box.setAttribute('visible', 'true'); // キューブ表示
+      startButton.style.display = 'none';  // ボタン非表示
     });
   </script>
 
