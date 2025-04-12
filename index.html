@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>カメラプレビュー & AR</title>
-  <!-- A-Frame と MindAR のライブラリ読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
   <style>
@@ -22,7 +21,7 @@
     #scene-container {
       position: relative;
       width: 100vw;
-      height: 70vh; /* AR シーンの高さ */
+      height: 70vh;
     }
     #controls {
       text-align: center;
@@ -36,10 +35,8 @@
   </style>
 </head>
 <body>
-  <!-- タイトル -->
   <h1>カメラプレビュー</h1>
-  
-  <!-- ARシーン（MindAR.js が内部でカメラ映像を表示） -->
+
   <div id="scene-container">
     <a-scene id="ar-scene"
       mindar-image="imageTargetSrc: './targets.mind'; autoStart: false;"
@@ -50,36 +47,30 @@
       style="width: 100%; height: 100%;">
       
       <a-assets></a-assets>
-      
-      <!-- iOS 対応用：MindAR が内部でカメラを管理するため、mindar-camera 属性を追加 -->
+
       <a-camera mindar-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      
-      <!-- ターゲット画像に反応して表示される AR オーバーレイ -->
-      <a-entity id="ar-overlay" mindar-image-target="targetIndex: 0">
-        <!-- 青いキューブ -->
-        <a-box id="blue-cube" position="0 0.1 0" scale="0.5 0.5 0.5" material="color: blue;"></a-box>
-        <!-- 赤い枠（認識範囲の目安） -->
+
+      <a-entity id="ar-overlay" mindar-image-target="targetIndex: 0" visible="false">
+        <a-box position="0 0.1 0" scale="0.5 0.5 0.5" material="color: blue;"></a-box>
         <a-box position="0 0 0" scale="1.2 1.2 0.01" material="color: red; opacity: 0.5;"></a-box>
       </a-entity>
     </a-scene>
   </div>
-  
-  <!-- コントロールボタン（ARシーン下部に配置） -->
+
   <div id="controls">
-    <button id="cameraToggle">カメラ OFF</button>
-    <button id="arToggle">AR OFF</button>
+    <button id="cameraToggle">カメラ ON</button>
+    <button id="arToggle">AR ON</button>
   </div>
-  
+
   <script>
     const sceneEl = document.querySelector('#ar-scene');
     const cameraToggle = document.getElementById('cameraToggle');
     const arToggle = document.getElementById('arToggle');
     const arOverlay = document.getElementById('ar-overlay');
-    
-    // カメラ on/off は MindAR の start()/stop() により制御
+
     let cameraOn = false;
-    let arOn = true;  // AR オーバーレイの表示状態
-    
+    let arOn = false;
+
     async function startCamera() {
       try {
         await sceneEl.components['mindar-image'].start();
@@ -88,17 +79,17 @@
         console.log('カメラ起動');
       } catch (error) {
         console.error('カメラ起動エラー:', error);
-        alert('カメラを起動できませんでした。設定や権限を確認してください。');
+        alert('カメラを起動できませんでした。');
       }
     }
-    
+
     function stopCamera() {
       sceneEl.components['mindar-image'].stop();
       cameraOn = false;
       cameraToggle.textContent = 'カメラ ON';
       console.log('カメラ停止');
     }
-    
+
     cameraToggle.addEventListener('click', () => {
       if (cameraOn) {
         stopCamera();
@@ -106,24 +97,13 @@
         startCamera();
       }
     });
-    
-    // AR機能 on/off：オーバーレイ（青いキューブ＋赤枠）の visible 属性を切り替え
+
     arToggle.addEventListener('click', () => {
-      if (arOn) {
-        arOverlay.setAttribute('visible', 'false');
-        arToggle.textContent = 'AR ON';
-        arOn = false;
-        console.log('AR機能停止');
-      } else {
-        arOverlay.setAttribute('visible', 'true');
-        arToggle.textContent = 'AR OFF';
-        arOn = true;
-        console.log('AR機能起動');
-      }
+      arOn = !arOn;
+      arOverlay.setAttribute('visible', arOn.toString());
+      arToggle.textContent = arOn ? 'AR OFF' : 'AR ON';
+      console.log(`AR ${arOn ? '表示' : '非表示'}`);
     });
-    
-    // 初期状態：ユーザー操作でカメラ起動（iOS 対策）
-    // ページ読み込み後、ユーザーがカメラONボタンを押すまで何も起動しません。
   </script>
 </body>
 </html>
