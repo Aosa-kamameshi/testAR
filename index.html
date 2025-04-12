@@ -1,56 +1,56 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>カメラプレビュー</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MindAR カメラプレビュー</title>
+
+  <!-- 必要なライブラリ読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #stopButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+    }
+  </style>
 </head>
 <body>
-  <h1>カメラプレビュー</h1>
-  <video id="video" width="640" height="480" autoplay playsinline></video>
   <button id="stopButton">カメラ停止</button>
-  
+
+  <!-- MindAR A-Frameのシーン -->
+  <a-scene mindar-image="imageTargetSrc: ./targets.mind; autoStart: true;" 
+           vr-mode-ui="enabled: false" 
+           device-orientation-permission-ui="enabled: true"
+           embedded>
+
+    <a-assets>
+      <!-- 必要があれば glbモデルなどをここで読み込む -->
+    </a-assets>
+
+    <!-- カメラはMindAR側で制御する -->
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- ターゲット画像に対応する3Dモデル -->
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-box position="0 0.1 0" material="color: #4CC3D9;"></a-box>
+    </a-entity>
+  </a-scene>
+
   <script>
-    let stream;
+    let sceneEl = document.querySelector('a-scene');
 
-    // カメラにアクセスする関数
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }
-        });
-        const video = document.getElementById('video');
-        video.srcObject = stream;
-      } catch (err) {
-        console.error("カメラの取得に失敗しました: ", err);
-        alert("背面カメラにアクセスできませんでした。許可を確認してください。");
+    document.getElementById('stopButton').addEventListener('click', () => {
+      const mindarComponent = sceneEl.components['mindar-image'];
+      if (mindarComponent) {
+        mindarComponent.stop();
+        console.log("MindARのカメラ停止");
       }
-    }
-
-
-    // カメラ停止の関数
-    function stopCamera() {
-      if (stream) {
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        console.log("カメラが停止しました。");
-      }
-    }
-
-    document.getElementById('stopButton').addEventListener('click', stopCamera);
-
-    // ブラウザに適応した関数を呼び出す
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      startCamera(); // カメラを開始
-    } else if (navigator.webkitGetUserMedia) {
-      navigator.webkitGetUserMedia({ video: true }, function(stream) {
-        document.getElementById('video').srcObject = stream;
-      }, function(err) {
-        alert("Webkitブラウザでのカメラアクセスに失敗しました");
-      });
-    } else {
-      alert("このブラウザはカメラ機能に対応していません");
-    }
+    });
   </script>
 </body>
 </html>
