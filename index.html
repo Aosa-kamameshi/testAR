@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
-    <meta charset="utf-8" />
-    <title>My WebAR with MindAR.js</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+    <meta charset="UTF-8" />
+    <title>MindAR テスト</title>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.2.0/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.7/dist/mindar-image-aframe.prod.js"></script>
     <style>
       body {
         margin: 0;
@@ -13,24 +13,27 @@
     </style>
   </head>
   <body>
-    <a-scene
-      mindar-image="imageTargetSrc: targets.mind; autoStart: true; filterMinCF:0.0001; filterBeta: 0.001"
-      embedded
-      color-space="sRGB"
-      renderer="colorManagement: true, physicallyCorrectLights"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: true"
-    >
+    <!-- 日本語でカメラ使用を明示 -->
+    <p style="position:absolute; z-index:999; background:rgba(0,0,0,0.7); color:#fff; padding:10px;">
+      このARを使用するにはカメラへのアクセスを許可してください📷
+    </p>
+
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
+             color-space="sRGB" 
+             embedded 
+             renderer="colorManagement: true, physicallyCorrectLights" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: true">
+      
       <a-assets>
-        <!-- 必要があれば glbモデルなどをここで読み込む -->
+        <!-- モデルなどをここで読み込む -->
       </a-assets>
 
-      <!-- カメラ -->
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- ターゲット画像が見つかった時に表示される3Dオブジェクト -->
       <a-entity mindar-image-target="targetIndex: 0">
-        <a-box position="0 0.1 0" material="color: #4CC3D9;"></a-box>
+        <!-- ここに表示させる3Dや画像を追加 -->
+        <a-box color="red" position="0 0.1 0" depth="0.1" height="0.1" width="0.1"></a-box>
       </a-entity>
     </a-scene>
   </body>
