@@ -16,14 +16,17 @@
     // カメラにアクセスする関数
     async function startCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
         const video = document.getElementById('video');
         video.srcObject = stream;
       } catch (err) {
         console.error("カメラの取得に失敗しました: ", err);
-        alert("カメラにアクセスできませんでした。許可を確認してください。");
+        alert("背面カメラにアクセスできませんでした。許可を確認してください。");
       }
     }
+
 
     // カメラ停止の関数
     function stopCamera() {
