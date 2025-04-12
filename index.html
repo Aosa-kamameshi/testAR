@@ -56,6 +56,32 @@
         padding: 8px 16px;
       }
     }
+
+    /* モーダルスタイル */
+    #popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 80%;
+      text-align: center;
+    }
+
+    #popup button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 1rem;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -79,8 +105,6 @@
     <a-entity mindar-image-target="targetIndex: 0">
       <a-box position="0 0.1 0" material="color: blue;"></a-box>
     </a-entity>
-
-    <!-- 必要に応じて他の3Dオブジェクトを追加 -->
   </a-scene>
 
   <!-- ボタン -->
@@ -89,25 +113,52 @@
     <button id="stopButton">AR OFF</button>
   </div>
 
+  <!-- カスタムポップアップ -->
+  <div id="popup">
+    <p id="popupMessage"></p>
+    <button onclick="closePopup()">閉じる</button>
+  </div>
+
   <script>
     const sceneEl = document.querySelector("a-scene");
     const startButton = document.getElementById("startButton");
     const stopButton = document.getElementById("stopButton");
+    const popup = document.getElementById("popup");
+    const popupMessage = document.getElementById("popupMessage");
 
     let arStarted = false;
+
+    function showPopup(message) {
+      popupMessage.textContent = message;
+      popup.style.display = "block";
+    }
+
+    function closePopup() {
+      popup.style.display = "none";
+    }
 
     // カメラ開始とAR開始
     startButton.addEventListener("click", async () => {
       if (arStarted) return;
 
       try {
+        showPopup("カメラ許可をリクエスト中...");
         await navigator.mediaDevices.getUserMedia({ video: true }); // 許可要求
-        await sceneEl.components["mindar-image"].start(); // AR開始
-        arStarted = true;
-        console.log("AR開始");
+        showPopup("カメラ許可成功");
+
+        const mindarComponent = sceneEl.components["mindar-image"];
+        if (mindarComponent) {
+          showPopup("ARコンポーネント開始");
+          await mindarComponent.start(); 
+          arStarted = true;
+          startButton.style.display = "none"; 
+          stopButton.style.display = "block"; 
+          showPopup("AR開始");
+        } else {
+          showPopup("ARコンポーネントがロードされていません");
+        }
       } catch (e) {
-        console.error("カメラ許可が必要です:", e);
-        alert("カメラへのアクセスを許可してください。");
+        showPopup("エラー: " + e.message); // エラーメッセージをポップアップ表示
       }
     });
 
@@ -116,7 +167,7 @@
       if (arStarted) {
         sceneEl.components["mindar-image"].stop();
         arStarted = false;
-        console.log("AR停止");
+        showPopup("AR停止");
       }
     });
   </script>
