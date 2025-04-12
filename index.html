@@ -10,13 +10,34 @@
         margin: 0;
         overflow: hidden;
       }
+      #cameraPermissionNotice, #cameraErrorMessage {
+        position: absolute;
+        z-index: 999;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 15px;
+        font-size: 16px;
+        max-width: 90%;
+        margin: 10px;
+        border-radius: 8px;
+      }
+      #cameraErrorMessage {
+        display: none;
+        background: rgba(255, 0, 0, 0.8);
+      }
     </style>
   </head>
   <body>
-    <!-- 日本語でカメラ使用を明示 -->
-    <p style="position:absolute; z-index:999; background:rgba(0,0,0,0.7); color:#fff; padding:10px;">
+    <!-- カメラ許可の案内 -->
+    <div id="cameraPermissionNotice">
       このARを使用するにはカメラへのアクセスを許可してください📷
-    </p>
+    </div>
+
+    <!-- カメラエラー表示 -->
+    <div id="cameraErrorMessage">
+      ❌ カメラの起動に失敗しました。<br>
+      ブラウザの設定でカメラアクセスが許可されているかをご確認ください。
+    </div>
 
     <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
              color-space="sRGB" 
@@ -24,17 +45,39 @@
              renderer="colorManagement: true, physicallyCorrectLights" 
              vr-mode-ui="enabled: false" 
              device-orientation-permission-ui="enabled: true">
-      
+
       <a-assets>
-        <!-- モデルなどをここで読み込む -->
+        <!-- モデルや画像読み込み -->
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
       <a-entity mindar-image-target="targetIndex: 0">
-        <!-- ここに表示させる3Dや画像を追加 -->
         <a-box color="red" position="0 0.1 0" depth="0.1" height="0.1" width="0.1"></a-box>
       </a-entity>
     </a-scene>
+
+    <script>
+      const sceneEl = document.querySelector('a-scene');
+      const errorMessageEl = document.getElementById('cameraErrorMessage');
+      const permissionNoticeEl = document.getElementById('cameraPermissionNotice');
+
+      sceneEl.addEventListener('loaded', () => {
+        const mindarComponent = sceneEl.components['mindar-image'];
+        if (mindarComponent) {
+          mindarComponent.start()
+            .then(() => {
+              // カメラ開始成功 → 案内を消す
+              permissionNoticeEl.style.display = 'none';
+            })
+            .catch((err) => {
+              // カメラエラー表示
+              console.error("カメラ起動エラー:", err);
+              permissionNoticeEl.style.display = 'none';
+              errorMessageEl.style.display = 'block';
+            });
+        }
+      });
+    </script>
   </body>
 </html>
