@@ -11,25 +11,27 @@
 
   <style>
     body { margin: 0; overflow: hidden; }
-    #stopButton {
+    #stopButton, #startButton {
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 999;
+      margin-top: 40px;
     }
   </style>
 </head>
 <body>
+  <button id="startButton">カメラ開始</button>
   <button id="stopButton">カメラ停止</button>
 
   <!-- MindAR A-Frameのシーン -->
-  <a-scene mindar-image="imageTargetSrc: ./targets.mind; autoStart: true;" 
+  <a-scene mindar-image="imageTargetSrc: './target.mind'; autoStart: false;" 
            vr-mode-ui="enabled: false" 
            device-orientation-permission-ui="enabled: true"
            embedded>
 
     <a-assets>
-      <!-- 必要があれば glbモデルなどをここで読み込む -->
+      <a-asset-item id="model" src="path_to_model.glb"></a-asset-item>
     </a-assets>
 
     <!-- カメラはMindAR側で制御する -->
@@ -37,17 +39,30 @@
 
     <!-- ターゲット画像に対応する3Dモデル -->
     <a-entity mindar-image-target="targetIndex: 0">
-      <a-box position="0 0.1 0" material="color: #4CC3D9;"></a-box>
+      <!-- 3Dモデル -->
+      <a-entity gltf-model="#model" position="0 0.1 0"></a-entity>
+      
+      <!-- 枠（ターゲット画像の周りに表示） -->
+      <a-box position="0 0 0" scale="1.2 1.2 0.1" material="color: #FF0000; opacity: 0.5;"></a-box>
     </a-entity>
   </a-scene>
 
   <script>
     let sceneEl = document.querySelector('a-scene');
+    let mindarComponent = sceneEl.components['mindar-image'];
 
-    document.getElementById('stopButton').addEventListener('click', () => {
-      const mindarComponent = sceneEl.components['mindar-image'];
+    // カメラ開始の処理
+    document.getElementById('startButton').addEventListener('click', () => {
       if (mindarComponent) {
-        mindarComponent.stop();
+        mindarComponent.start(); // カメラを開始
+        console.log("MindARのカメラ開始");
+      }
+    });
+
+    // カメラ停止の処理
+    document.getElementById('stopButton').addEventListener('click', () => {
+      if (mindarComponent) {
+        mindarComponent.stop(); // カメラを停止
         console.log("MindARのカメラ停止");
       }
     });
