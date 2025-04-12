@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>背面カメラ + A-Frame 3D</title>
 
+  <!-- A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
 
   <style>
@@ -49,35 +50,46 @@
 </head>
 <body>
 
+  <!-- 背景に使うカメラ映像 -->
   <video id="videoBackground" autoplay muted playsinline></video>
+
+  <!-- スタートボタン -->
   <button id="startButton">スタート</button>
 
+  <!-- A-Frameシーン -->
   <a-scene embedded>
     <a-assets></a-assets>
 
     <a-camera position="0 1.6 0"></a-camera>
+
+    <!-- ボタンで表示されるキューブ -->
     <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
   </a-scene>
 
   <script>
-    document.getElementById('startButton').addEventListener('click', async () => {
+    const video = document.getElementById('videoBackground');
+    const startButton = document.getElementById('startButton');
+    const box = document.getElementById('blueBox');
+
+    startButton.addEventListener('click', async () => {
       try {
-        // カメラ許可リクエスト（背面カメラ）
+        // 背面カメラをリクエスト
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { exact: "environment" } }
         });
-
-        const video = document.getElementById('videoBackground');
         video.srcObject = stream;
-
-        // カメラが正常に動作している場合
-        video.style.display = 'block';
-        document.getElementById('blueBox').setAttribute('visible', 'true');
-        document.getElementById('startButton').style.display = 'none';
       } catch (err) {
-        console.error("カメラアクセスエラー:", err);
-        alert("カメラが利用できません。設定を確認してください。");
+        console.warn("背面カメラが使えないため、前面カメラを使用します。", err);
+        // フォールバック：前面カメラ
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" }
+        });
+        video.srcObject = fallbackStream;
       }
+
+      video.style.display = 'block';       // カメラ映像を表示
+      box.setAttribute('visible', 'true'); // キューブ表示
+      startButton.style.display = 'none';  // ボタン非表示
     });
   </script>
 
