@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAR カメラプレビュー</title>
 
   <!-- 必要なライブラリ読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
@@ -21,6 +20,8 @@
   </style>
 </head>
 <body>
+  <h1>MindAR カメラプレビュー</h1>
+  <video id="video" width="640" height="480" autoplay playsinline></video>
   <button id="startButton">カメラ開始</button>
   <button id="stopButton">カメラ停止</button>
 
