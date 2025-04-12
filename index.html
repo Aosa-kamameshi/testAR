@@ -3,35 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MindAR カメラプレビュー</title>
+  <title>カメラプレビュー + AR</title>
 
-  <!-- ライブラリ読み込み -->
+  <!-- 必要ライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     h1 {
-      text-align: center;
-      font-size: 1.5em;
-      padding: 10px;
-      background: #222;
-      color: #fff;
-      margin: 0;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      z-index: 1000;
+      background: rgba(0,0,0,0.5);
+      padding: 8px;
+      border-radius: 5px;
     }
     #startButton, #stopButton {
       position: absolute;
-      z-index: 999;
       left: 10px;
-      padding: 10px 20px;
-      font-size: 1em;
-      background: #0080ff;
-      color: white;
-      border: none;
-      border-radius: 5px;
+      z-index: 1000;
+      padding: 10px;
+      font-size: 16px;
     }
     #startButton { top: 60px; }
-    #stopButton { top: 110px; background: #ff3333; }
+    #stopButton { top: 110px; }
   </style>
 </head>
 <body>
@@ -39,43 +37,55 @@
   <button id="startButton">カメラ開始</button>
   <button id="stopButton">カメラ停止</button>
 
-  <!-- MindAR A-Frameのシーン -->
-  <a-scene mindar-image="imageTargetSrc: './targets.mind'; autoStart: false;" 
+  <!-- ARシーン -->
+  <a-scene mindar-image="imageTargetSrc: './target.mind'; autoStart: false;"
            vr-mode-ui="enabled: false"
            device-orientation-permission-ui="enabled: true"
            embedded
-           renderer="colorManagement: true; physicallyCorrectLights: true;">
+           color-space="sRGB"
+           renderer="precision: mediump; antialias: true;">
     
-    <a-assets></a-assets>
+    <a-assets>
+      <!-- 必要なら glb を追加 -->
+    </a-assets>
 
-    <!-- カメラ -->
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <!-- カメラ（MindAR用） -->
+    <a-camera position="0 0 0" look-controls="enabled: false" mindar-camera></a-camera>
 
-    <!-- 認識範囲の赤枠 -->
+    <!-- ターゲット検出時のオブジェクト -->
     <a-entity mindar-image-target="targetIndex: 0">
-      <!-- 枠 -->
-      <a-box position="0 0 0" scale="1.2 1.2 0.01" material="color: red; opacity: 0.3;"></a-box>
-      <!-- 認識時に表示する青いキューブ -->
-      <a-box position="0 0.1 0" scale="0.5 0.5 0.5" material="color: blue;"></a-box>
+      <!-- 青いキューブ -->
+      <a-box position="0 0.1 0" material="color: #4CC3D9;"></a-box>
+      <!-- 赤枠（透明） -->
+      <a-box position="0 0 0" scale="1.2 1.2 0.01" material="color: red; opacity: 0.5;"></a-box>
     </a-entity>
   </a-scene>
 
   <script>
     const sceneEl = document.querySelector('a-scene');
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
 
-    document.getElementById('startButton').addEventListener('click', async () => {
-      const mindarComponent = sceneEl.components['mindar-image'];
-      if (mindarComponent && !mindarComponent.active) {
-        await mindarComponent.start();
-        console.log("ARスタート");
+    let isStarted = false;
+
+    startButton.addEventListener('click', async () => {
+      if (!isStarted) {
+        try {
+          await sceneEl.components['mindar-image'].start();
+          console.log("MindAR スタート");
+          isStarted = true;
+        } catch (err) {
+          console.error("AR開始失敗:", err);
+          alert("カメラを起動できませんでした。設定や権限を確認してください。");
+        }
       }
     });
 
-    document.getElementById('stopButton').addEventListener('click', () => {
-      const mindarComponent = sceneEl.components['mindar-image'];
-      if (mindarComponent && mindarComponent.active) {
-        mindarComponent.stop();
-        console.log("ARストップ");
+    stopButton.addEventListener('click', () => {
+      if (isStarted) {
+        sceneEl.components['mindar-image'].stop();
+        console.log("MindAR 停止");
+        isStarted = false;
       }
     });
   </script>
