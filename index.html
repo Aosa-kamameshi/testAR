@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>My WebAR with MindAR.js</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene
+      mindar-image="imageTargetSrc: targets.mind; autoStart: true; filterMinCF:0.0001; filterBeta: 0.001"
+      embedded
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+    >
+      <a-assets>
+        <!-- 必要があれば glbモデルなどをここで読み込む -->
+      </a-assets>
+
+      <!-- カメラ -->
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- ターゲット画像が見つかった時に表示される3Dオブジェクト -->
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-box position="0 0.1 0" material="color: #4CC3D9;"></a-box>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
