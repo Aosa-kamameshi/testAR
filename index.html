@@ -1,83 +1,53 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <title>MindAR テスト</title>
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.2.0/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.7/dist/mindar-image-aframe.prod.js"></script>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カメラプレビュー</title>
+</head>
+<body>
+  <h1>カメラプレビュー</h1>
+  <video id="video" width="640" height="480" autoplay></video>
+  <button id="stopButton">カメラ停止</button>
+  
+  <script>
+    let stream;
+
+    // カメラにアクセスする関数
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+      } catch (err) {
+        console.error("カメラの取得に失敗しました: ", err);
+        alert("カメラにアクセスできませんでした。許可を確認してください。");
       }
-      #cameraPermissionNotice, #cameraErrorMessage {
-        position: absolute;
-        z-index: 999;
-        background: rgba(0, 0, 0, 0.7);
-        color: #fff;
-        padding: 15px;
-        font-size: 16px;
-        max-width: 90%;
-        margin: 10px;
-        border-radius: 8px;
+    }
+
+    // カメラ停止の関数
+    function stopCamera() {
+      if (stream) {
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        console.log("カメラが停止しました。");
       }
-      #cameraErrorMessage {
-        display: none;
-        background: rgba(255, 0, 0, 0.8);
-      }
-    </style>
-  </head>
-  <body>
-    <!-- カメラ許可の案内 -->
-    <div id="cameraPermissionNotice">
-      このARを使用するにはカメラへのアクセスを許可してください📷
-    </div>
+    }
 
-    <!-- カメラエラー表示 -->
-    <div id="cameraErrorMessage">
-      ❌ カメラの起動に失敗しました。<br>
-      ブラウザの設定でカメラアクセスが許可されているかをご確認ください。
-    </div>
+    document.getElementById('stopButton').addEventListener('click', stopCamera);
 
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
-             color-space="sRGB" 
-             embedded 
-             renderer="colorManagement: true, physicallyCorrectLights" 
-             vr-mode-ui="enabled: false" 
-             device-orientation-permission-ui="enabled: true">
-
-      <a-assets>
-        <!-- モデルや画像読み込み -->
-      </a-assets>
-
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-box color="red" position="0 0.1 0" depth="0.1" height="0.1" width="0.1"></a-box>
-      </a-entity>
-    </a-scene>
-
-    <script>
-      const sceneEl = document.querySelector('a-scene');
-      const errorMessageEl = document.getElementById('cameraErrorMessage');
-      const permissionNoticeEl = document.getElementById('cameraPermissionNotice');
-
-      sceneEl.addEventListener('loaded', () => {
-        const mindarComponent = sceneEl.components['mindar-image'];
-        if (mindarComponent) {
-          mindarComponent.start()
-            .then(() => {
-              // カメラ開始成功 → 案内を消す
-              permissionNoticeEl.style.display = 'none';
-            })
-            .catch((err) => {
-              // カメラエラー表示
-              console.error("カメラ起動エラー:", err);
-              permissionNoticeEl.style.display = 'none';
-              errorMessageEl.style.display = 'block';
-            });
-        }
+    // ブラウザに適応した関数を呼び出す
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      startCamera(); // カメラを開始
+    } else if (navigator.webkitGetUserMedia) {
+      navigator.webkitGetUserMedia({ video: true }, function(stream) {
+        document.getElementById('video').srcObject = stream;
+      }, function(err) {
+        alert("Webkitブラウザでのカメラアクセスに失敗しました");
       });
-    </script>
-  </body>
+    } else {
+      alert("このブラウザはカメラ機能に対応していません");
+    }
+  </script>
+</body>
 </html>
