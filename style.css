@@ -23,7 +23,9 @@ body, html {
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  z-index: -1;
+  z-index: 0; /* z-indexを変更 */
+  display: none; /* 初期状態は非表示 */
+  background-color: transparent; /* 背景色を透明に */
 }
 
 /* ARコンテナスタイルを追加 */
@@ -35,6 +37,7 @@ body, html {
   height: 100vh;
   z-index: 1;
   pointer-events: none;
+  display: none; /* 初期状態は非表示 */
 }
 
 a-scene {
@@ -233,4 +236,11 @@ a-scene {
 /* ミラーリングをサポート */
 .mirror-mode {
   transform: scaleX(-1);
+}
+
+/* Safari用のビデオ背景修正 */
+@supports (-webkit-touch-callout: none) {
+  #videoBackground {
+    background-color: transparent;
+  }
 }
