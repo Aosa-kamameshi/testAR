@@ -11,6 +11,15 @@ const colorSelectBtn = document.getElementById('colorSelectBtn');
 const colorPanel = document.getElementById('colorPanel');
 const resetPositionBtn = document.getElementById('resetPositionBtn');
 const colorOptions = document.querySelectorAll('.color-option');
+const switchCameraBtn = document.getElementById('switchCameraBtn');
+
+// カメラの状態を追跡
+let currentStream = null;
+let isFrontCamera = false;
+let hasMultipleCameras = false;
+
+// モーションセンサーがサポートされているか確認
+const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
 
 // モーションセンサーの許可をリクエストする関数
 async function requestMotionPermission() {
@@ -42,23 +51,56 @@ async function requestMotionPermission() {
   }
 }
 
-// カメラアクセスの許可をリクエストする関数
-async function requestCameraPermission() {
+// 利用可能なカメラの数を確認する関数
+async function checkAvailableCameras() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    return false;
+  }
+  
   try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+    return videoDevices.length > 1;
+  } catch (err) {
+    console.error("カメラ数の確認に失敗:", err);
+    return false;
+  }
+}
+
+// カメラアクセスの許可をリクエストする関数
+async function requestCameraPermission(preferFront = false) {
+  try {
+    // 現在のストリームを停止
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
+    
     showMessage("カメラへのアクセスを許可してください");
-    // まず背面カメラを試す
+    
+    const facingMode = preferFront ? "user" : { exact: "environment" };
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } }
+        video: { facingMode: facingMode }
       });
-      return { stream, isFrontCamera: false };
-    } catch (backCameraErr) {
-      // 背面カメラが失敗したら前面カメラを試す
-      console.warn("背面カメラアクセスエラー:", backCameraErr);
-      const frontStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" }
+      
+      // 複数カメラがあるか確認
+      hasMultipleCameras = await checkAvailableCameras();
+      if (hasMultipleCameras) {
+        switchCameraBtn.style.display = 'flex';
+      }
+      
+      return { stream, isFrontCamera: preferFront };
+    } catch (err) {
+      // 一方のカメラが失敗した場合、もう一方を試す
+      console.warn(`${preferFront ? '前面' : '背面'}カメラアクセスエラー:`, err);
+      const alternativeFacingMode = preferFront ? { exact: "environment" } : "user";
+      
+      const alternativeStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: alternativeFacingMode }
       });
-      return { stream: frontStream, isFrontCamera: true };
+      
+      return { stream: alternativeStream, isFrontCamera: !preferFront };
     }
   } catch (err) {
     console.error("カメラアクセスエラー:", err);
@@ -86,6 +128,29 @@ function showMessage(text, duration = 3000) {
 // ローディングインジケーターを表示/非表示する関数
 function showLoading(show) {
   loadingIndicator.style.display = show ? 'flex' : 'none';
+}
+
+// カメラを切り替える関数
+async function switchCamera() {
+  try {
+    showLoading(true);
+    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
+    
+    // ビデオ要素に新しいストリームを設定
+    video.srcObject = stream;
+    currentStream = stream;
+    isFrontCamera = newIsFrontCamera;
+    
+    // 前面カメラの場合はミラーリングを適用
+    video.classList.toggle('mirror-mode', isFrontCamera);
+    
+    showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
+    showLoading(false);
+  } catch (err) {
+    console.error("カメラ切り替えエラー:", err);
+    showMessage("カメラの切り替えに失敗しました");
+    showLoading(false);
+  }
 }
 
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
@@ -125,27 +190,42 @@ async function enableMotionSensor() {
   showLoading(false);
 }
 
-// アプリを開始する関数 - モーションセンサーなしでスタート
+// アプリを開始する関数
 async function startApp() {
   showLoading(true);
   
   try {
-    // カメラの許可のみを取得
-    const { stream, isFrontCamera } = await requestCameraPermission();
+    // カメラの許可を取得
+    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
     
+    // グローバル変数を更新
+    currentStream = stream;
+    isFrontCamera = newIsFrontCamera;
+    
+    // ビデオ要素に新しいストリームを設定
     video.srcObject = stream;
+    
+    // 前面カメラの場合はミラーリングを適用
+    video.classList.toggle('mirror-mode', isFrontCamera);
+    
     await new Promise(resolve => {
       video.onloadedmetadata = () => {
-        video.play();
-        video.style.display = 'block';
-        resolve();
+        video.play().then(() => {
+          resolve();
+        }).catch(error => {
+          console.error("ビデオ再生エラー:", error);
+          resolve();
+        });
       };
     });
+    
+    // カメラ表示
+    video.style.display = 'block';
     
     if (isFrontCamera) {
       showMessage('前面カメラを使用しています');
     } else {
-      showMessage('カメラを起動しました');
+      showMessage('背面カメラを使用しています');
     }
     
     // UI表示
@@ -156,12 +236,14 @@ async function startApp() {
     arObject.setAttribute('visible', 'true');
     
     // モーションセンサーボタンの表示条件
-    if (typeof DeviceMotionEvent !== 'undefined' && 
-        typeof DeviceMotionEvent.requestPermission === 'function') {
-      enableMotionButton.style.display = 'block';
-    } else {
-      // 許可が不要なブラウザでは自動的にモーションセンサーを有効化
-      window.addEventListener('deviceorientation', handleDeviceOrientation);
+    if (isMotionSupported) {
+      if (typeof DeviceMotionEvent !== 'undefined' && 
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        enableMotionButton.style.display = 'block';
+      } else {
+        // 許可が不要なブラウザでは自動的にモーションセンサーを有効化
+        window.addEventListener('deviceorientation', handleDeviceOrientation);
+      }
     }
     
     showLoading(false);
@@ -202,12 +284,21 @@ startButton.addEventListener('click', startApp);
 enableMotionButton.addEventListener('click', enableMotionSensor);
 colorSelectBtn.addEventListener('click', toggleColorPanel);
 resetPositionBtn.addEventListener('click', resetObjectPosition);
+switchCameraBtn.addEventListener('click', switchCamera);
 
 // カラーオプションのクリックイベント
 colorOptions.forEach(option => {
   option.addEventListener('click', () => {
     changeObjectColor(option.dataset.color);
   });
+});
+
+// 画面の向きが変わったときにビデオサイズを調整
+window.addEventListener('resize', () => {
+  // 必要に応じてビデオサイズを調整
+  if (video.style.display !== 'none') {
+    // リサイズ処理
+  }
 });
 
 // 最初のカラーオプションをアクティブに
