@@ -35,6 +35,21 @@
       cursor: pointer;
       z-index: 2;
     }
+    #enableMotionButton {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+      z-index: 2;
+      display: none;
+    }
     a-scene {
       width: 100vw;
       height: 100vh;
@@ -69,6 +84,7 @@
 <body>
   <video id="videoBackground" autoplay muted playsinline></video>
   <button id="startButton">スタート</button>
+  <button id="enableMotionButton">モーションセンサーを有効化</button>
   <div id="statusMessage"></div>
   <div id="loadingIndicator">読み込み中...</div>
   <a-scene embedded>
@@ -79,6 +95,7 @@
   <script>
     const video = document.getElementById('videoBackground');
     const startButton = document.getElementById('startButton');
+    const enableMotionButton = document.getElementById('enableMotionButton');
     const box = document.getElementById('blueBox');
     const scene = document.querySelector('a-scene');
     const statusMessage = document.getElementById('statusMessage');
@@ -91,7 +108,6 @@
         if (typeof DeviceMotionEvent !== 'undefined' && 
             typeof DeviceMotionEvent.requestPermission === 'function') {
           
-          showMessage("モーションセンサーへのアクセスを許可してください");
           const motionPermission = await DeviceMotionEvent.requestPermission();
           
           // 方向センサーも許可リクエスト
@@ -140,14 +156,16 @@
     }
     
     // メッセージを表示する関数
-    function showMessage(text) {
+    function showMessage(text, duration = 5000) {
       statusMessage.textContent = text;
       statusMessage.style.display = 'block';
       
-      // 5秒後にメッセージを消す
-      setTimeout(() => {
-        statusMessage.style.display = 'none';
-      }, 5000);
+      // 指定時間後にメッセージを消す
+      if (duration > 0) {
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, duration);
+      }
     }
     
     // ローディングインジケーターを表示/非表示する関数
@@ -169,12 +187,29 @@
       box.setAttribute('position', {x: x, y: y, z: -3});
     }
     
-    // アプリを開始する関数
+    // モーションセンサーを有効化する関数
+    async function enableMotionSensor() {
+      showLoading(true);
+      const motionGranted = await requestMotionPermission();
+      
+      if (motionGranted) {
+        // モーションセンサーのイベントリスナーを追加
+        window.addEventListener('deviceorientation', handleDeviceOrientation);
+        showMessage('モーションセンサーが有効になりました。デバイスを動かして青い箱を移動させてみてください。');
+        enableMotionButton.style.display = 'none';
+      } else {
+        showMessage('モーションセンサーを有効にできませんでした。');
+      }
+      
+      showLoading(false);
+    }
+    
+    // アプリを開始する関数 - モーションセンサーなしでスタート
     async function startApp() {
       showLoading(true);
       
       try {
-        // ステップ1: カメラの許可を取得
+        // カメラの許可のみを取得
         const { stream, isFrontCamera } = await requestCameraPermission();
         
         video.srcObject = stream;
@@ -188,22 +223,24 @@
         
         if (isFrontCamera) {
           showMessage('背面カメラにアクセスできないため、前面カメラを使用しています。');
+        } else {
+          showMessage('カメラを起動しました。');
         }
-        
-        // ステップ2: モーションセンサーの許可を取得
-        const motionGranted = await requestMotionPermission();
         
         // アプリを表示
         box.setAttribute('visible', 'true');  // キューブ表示
         startButton.style.display = 'none';   // ボタン非表示
         showLoading(false);
         
-        if (motionGranted) {
-          // モーションセンサーのイベントリスナーを追加
-          window.addEventListener('deviceorientation', handleDeviceOrientation);
-          showMessage('準備完了！デバイスを動かして青い箱を移動させてみてください。');
+        // モーションセンサーを有効化するボタンを表示
+        // iOS Safariなどモーションセンサー許可が必要なデバイスの場合のみ
+        if (typeof DeviceMotionEvent !== 'undefined' && 
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          enableMotionButton.style.display = 'block';
+          showMessage('箱を動かすにはモーションセンサーを有効化してください。', 0);
         } else {
-          showMessage('モーションセンサーへのアクセスが許可されていないため、一部機能が制限されています。');
+          // 他のブラウザでは自動的にモーションセンサーを有効化
+          window.addEventListener('deviceorientation', handleDeviceOrientation);
         }
         
       } catch (err) {
@@ -216,20 +253,20 @@
     // スタートボタンのクリックイベント
     startButton.addEventListener('click', startApp);
     
+    // モーションセンサー有効化ボタンのクリックイベント
+    enableMotionButton.addEventListener('click', enableMotionSensor);
+    
     // タップで箱の色を変更するイベント
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (event) => {
+      // ボタンクリック時は色変更しない
+      if (event.target === startButton || event.target === enableMotionButton) {
+        return;
+      }
+      
       if (box.getAttribute('visible')) {
         // ランダムな色を生成
         const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
         box.setAttribute('material', 'color', randomColor);
-      }
-    });
-    
-    // ページ読み込み完了時
-    window.addEventListener('load', () => {
-      // サポートされていない機能のチェック
-      if (typeof DeviceMotionEvent === 'undefined') {
-        showMessage('お使いのデバイスはモーションセンサーをサポートしていない可能性があります。');
       }
     });
   </script>
