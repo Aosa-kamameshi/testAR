@@ -17,8 +17,21 @@
     </button>
   </div>
   
-  <!-- リアルタイムビュ用のvideo。カメラ起動後に表示されます -->
+  <!-- リアルタイムビュー用のvideo -->
   <video id="videoBackground" autoplay muted playsinline></video>
+  
+  <!-- AR表示用のコンテナ -->
+  <div id="arContainer">
+    <a-scene 
+      embedded
+      alpha="true" 
+      device-orientation-permission-ui="enabled: false"
+      renderer="antialias: true; alpha: true; colorManagement: true;"
+      vr-mode-ui="enabled: false">
+      <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
+      <a-box id="arObject" position="0 1 -3" material="color: #2196F3;" visible="false"></a-box>
+    </a-scene>
+  </div>
   
   <div id="statusMessage"></div>
   
@@ -34,6 +47,9 @@
         </button>
         <button id="resetPositionBtn" class="btn btn-icon btn-primary">
           <i class="fas fa-undo"></i>
+        </button>
+        <button id="switchCameraBtn" class="btn btn-icon btn-primary">
+          <i class="fas fa-sync"></i>
         </button>
       </div>
       <button id="enableMotionButton" class="btn btn-success">
@@ -51,15 +67,6 @@
       <div class="color-option" style="background-color: #9C27B0;" data-color="#9C27B0"></div>
     </div>
   </div>
-  
-  <!-- a-sceneに renderer=\"alpha: true\" を追加し、シーン背景を透明にして videoBackground が背面に表示されるように変更 -->
-  <a-scene 
-    device-orientation-permission-ui="enabled: false"
-    embedded renderer="alpha: true">
-    <a-assets></a-assets>
-    <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-    <a-box id="arObject" position="0 1 -3" material="color: #2196F3;" visible="false"></a-box>
-  </a-scene>
   
   <script src="script.js"></script>
 </body>
