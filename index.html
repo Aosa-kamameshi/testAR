@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>背面カメラ + A-Frame 3D</title>
-
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-
   <style>
     body, html {
       margin: 0;
@@ -14,7 +12,6 @@
       overflow: hidden;
       font-family: sans-serif;
     }
-
     #videoBackground {
       position: fixed;
       top: 0; left: 0;
@@ -24,7 +21,6 @@
       z-index: -1;
       display: none;
     }
-
     #startButton {
       position: absolute;
       top: 20px;
@@ -39,67 +35,193 @@
       cursor: pointer;
       z-index: 2;
     }
-
     a-scene {
       width: 100vw;
       height: 100vh;
       pointer-events: none;
     }
+    #statusMessage {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+      max-width: 80%;
+      display: none;
+    }
+    #loadingIndicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      background-color: rgba(0,0,0,0.7);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      display: none;
+    }
   </style>
 </head>
 <body>
-
   <video id="videoBackground" autoplay muted playsinline></video>
   <button id="startButton">スタート</button>
-
+  <div id="statusMessage"></div>
+  <div id="loadingIndicator">読み込み中...</div>
   <a-scene embedded>
     <a-assets></a-assets>
-
     <a-camera position="0 1.6 0"></a-camera>
     <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
   </a-scene>
-
   <script>
     const video = document.getElementById('videoBackground');
     const startButton = document.getElementById('startButton');
     const box = document.getElementById('blueBox');
     const scene = document.querySelector('a-scene');
-
+    const statusMessage = document.getElementById('statusMessage');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    
+    // モーションセンサーの許可をリクエストする関数
     async function requestMotionPermission() {
-      if (typeof DeviceMotionEvent !== 'undefined' &&
-          typeof DeviceMotionEvent.requestPermission === 'function') {
-        const result = await DeviceMotionEvent.requestPermission();
-        if (result !== 'granted') {
-          throw new Error("センサーの使用が許可されていません");
+      try {
+        // iOS 13+でのモーションセンサー許可リクエスト
+        if (typeof DeviceMotionEvent !== 'undefined' && 
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          const motionPermission = await DeviceMotionEvent.requestPermission();
+          
+          // 方向センサーも許可リクエスト
+          if (typeof DeviceOrientationEvent !== 'undefined' && 
+              typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const orientationPermission = await DeviceOrientationEvent.requestPermission();
+          }
+          
+          if (motionPermission !== 'granted') {
+            console.warn("モーションセンサーの使用が許可されていません");
+            return false;
+          }
         }
+        return true;
+      } catch (err) {
+        console.error("センサーアクセスエラー:", err);
+        showMessage("モーションセンサーへのアクセスに失敗しました。設定を確認してください。");
+        return false;
       }
     }
-
+    
+    // メッセージを表示する関数
+    function showMessage(text) {
+      statusMessage.textContent = text;
+      statusMessage.style.display = 'block';
+      
+      // 5秒後にメッセージを消す
+      setTimeout(() => {
+        statusMessage.style.display = 'none';
+      }, 5000);
+    }
+    
+    // ローディングインジケーターを表示/非表示する関数
+    function showLoading(show) {
+      loadingIndicator.style.display = show ? 'block' : 'none';
+    }
+    
+    // デバイスの向きに応じて3Dオブジェクトを更新する関数
+    function handleDeviceOrientation(event) {
+      if (!event || !box.getAttribute('visible')) return;
+      
+      // デバイスの向きに基づいて3Dオブジェクトの位置を調整
+      // 簡易的な実装として、デバイスの向きに応じて箱を移動させる
+      const tiltLR = event.gamma; // 左右の傾き (-90〜90)
+      const tiltFB = event.beta;  // 前後の傾き (-180〜180)
+      
+      // 箱の位置を更新（制限付き）
+      const x = Math.max(-3, Math.min(3, tiltLR / 30));
+      const y = Math.max(0, Math.min(3, 1 + tiltFB / 30));
+      box.setAttribute('position', {x: x, y: y, z: -3});
+    }
+    
+    // スタートボタンのクリックイベント
     startButton.addEventListener('click', async () => {
+      showLoading(true);
+      
       try {
         // モーションセンサーの許可をリクエスト
-        await requestMotionPermission();
-
+        const motionGranted = await requestMotionPermission();
+        
         // カメラ許可リクエスト（背面カメラ）
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }
-        });
-        video.srcObject = stream;
-
-        // カメラ映像のメタデータが読み込まれた後に処理を実行
-        video.onloadedmetadata = () => {
-          video.play();
-          video.style.display = 'block';
-          box.setAttribute('visible', 'true');  // キューブ表示
-          startButton.style.display = 'none';   // ボタン非表示
-        };
-
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } }
+          });
+          
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play();
+            video.style.display = 'block';
+            box.setAttribute('visible', 'true');  // キューブ表示
+            startButton.style.display = 'none';   // ボタン非表示
+            showLoading(false);
+            
+            if (!motionGranted) {
+              // センサー許可がない場合のメッセージを表示
+              showMessage('モーションセンサーへのアクセスが許可されていないため、一部機能が制限されています。');
+            } else {
+              // モーションセンサーのイベントリスナーを追加
+              window.addEventListener('deviceorientation', handleDeviceOrientation);
+              showMessage('準備完了！デバイスを動かして青い箱を移動させてみてください。');
+            }
+          };
+        } catch (cameraErr) {
+          // 背面カメラが利用できない場合のフォールバック：前面カメラを使用
+          console.warn("背面カメラアクセスエラー、前面カメラを試します:", cameraErr);
+          
+          try {
+            const frontStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: "user" }
+            });
+            
+            video.srcObject = frontStream;
+            video.onloadedmetadata = () => {
+              video.play();
+              video.style.display = 'block';
+              box.setAttribute('visible', 'true');
+              startButton.style.display = 'none';
+              showLoading(false);
+              showMessage('背面カメラにアクセスできないため、前面カメラを使用しています。');
+              
+              if (motionGranted) {
+                window.addEventListener('deviceorientation', handleDeviceOrientation);
+              }
+            };
+          } catch (frontCameraErr) {
+            throw new Error("カメラへのアクセスができません");
+          }
+        }
       } catch (err) {
-        console.warn("カメラアクセスエラー:", err);
-        alert("カメラアクセスに失敗しました。設定を確認してください。");
+        console.error("アクセスエラー:", err);
+        showLoading(false);
+        showMessage("カメラまたはセンサーアクセスに失敗しました。設定を確認してください。");
+      }
+    });
+    
+    // タップで箱の色を変更するイベント
+    document.addEventListener('click', () => {
+      if (box.getAttribute('visible')) {
+        // ランダムな色を生成
+        const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+        box.setAttribute('material', 'color', randomColor);
+      }
+    });
+    
+    // ページ読み込み完了時
+    window.addEventListener('load', () => {
+      // サポートされていない機能のチェック
+      if (typeof DeviceMotionEvent === 'undefined') {
+        showMessage('お使いのデバイスはモーションセンサーをサポートしていない可能性があります。');
       }
     });
   </script>
-
 </body>
 </html>
