@@ -3,15 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>背面カメラ + A-Frame 3D</title>
+  <title>AR体験</title>
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
+    :root {
+      --primary-color: #2962ff;
+      --accent-color: #00c853;
+      --dark-color: #212121;
+      --light-color: #fafafa;
+      --transition: all 0.3s ease;
+    }
+    
     body, html {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      color: var(--light-color);
+      background-color: #000;
+      height: 100%;
     }
+    
     #videoBackground {
       position: fixed;
       top: 0; left: 0;
@@ -21,85 +34,260 @@
       z-index: -1;
       display: none;
     }
-    #startButton {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 10px 20px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      background-color: #2196f3;
-      color: white;
-      cursor: pointer;
-      z-index: 2;
-    }
-    #enableMotionButton {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 10px 20px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      background-color: #4caf50;
-      color: white;
-      cursor: pointer;
-      z-index: 2;
-      display: none;
-    }
+    
     a-scene {
       width: 100vw;
       height: 100vh;
       pointer-events: none;
     }
+    
+    /* ボタンの共通スタイル */
+    .btn {
+      border: none;
+      border-radius: 50px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn:active {
+      transform: scale(0.95);
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    .btn-success {
+      background-color: var(--accent-color);
+      color: white;
+    }
+    
+    .btn-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* UI コンテナ */
+    .ui-container {
+      position: fixed;
+      bottom: 32px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    
+    /* スタートスクリーン */
+    #startScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, rgba(25,25,35,0.9) 0%, rgba(10,10,15,0.95) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    
+    #startScreen h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: white;
+      text-align: center;
+    }
+    
+    #startScreen p {
+      font-size: 1.1rem;
+      max-width: 80%;
+      text-align: center;
+      margin-bottom: 2rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    /* 操作パネル */
+    #controlPanel {
+      display: none;
+      background-color: rgba(33, 33, 33, 0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 28px;
+      padding: 8px;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    
+    /* モーション有効化ボタン */
+    #enableMotionButton {
+      display: none;
+      margin-top: 16px;
+    }
+    
+    /* ステータスメッセージ */
     #statusMessage {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      background-color: rgba(0,0,0,0.7);
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
       color: white;
-      padding: 10px;
-      border-radius: 5px;
-      z-index: 10;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
       max-width: 80%;
+      text-align: center;
+      z-index: 50;
       display: none;
+      transition: opacity 0.3s ease;
     }
+    
+    /* ローディングインジケーター */
     #loadingIndicator {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 5;
-      background-color: rgba(0,0,0,0.7);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
       display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--primary-color);
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* カラーピッカー */
+    #colorPanel {
+      display: none;
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(33, 33, 33, 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 16px;
+      z-index: 20;
+    }
+    
+    .color-options {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .color-option {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .color-option:hover, .color-option.active {
+      transform: scale(1.1);
+      border-color: white;
     }
   </style>
 </head>
 <body>
+  <div id="startScreen">
+    <h1>AR 体験</h1>
+    <p>あなたの環境に3Dオブジェクトを表示します。<br>カメラへのアクセスを許可してください。</p>
+    <button id="startButton" class="btn btn-primary">
+      <i class="fas fa-play"></i> スタート
+    </button>
+  </div>
+  
   <video id="videoBackground" autoplay muted playsinline></video>
-  <button id="startButton">スタート</button>
-  <button id="enableMotionButton">モーションセンサーを有効化</button>
+  
   <div id="statusMessage"></div>
-  <div id="loadingIndicator">読み込み中...</div>
+  
+  <div id="loadingIndicator">
+    <div class="spinner"></div>
+  </div>
+  
+  <div class="ui-container">
+    <div id="controlPanel">
+      <div class="controls">
+        <button id="colorSelectBtn" class="btn btn-icon btn-primary">
+          <i class="fas fa-palette"></i>
+        </button>
+        
+        <button id="resetPositionBtn" class="btn btn-icon btn-primary">
+          <i class="fas fa-undo"></i>
+        </button>
+      </div>
+      <button id="enableMotionButton" class="btn btn-success">
+        <i class="fas fa-compass"></i> モーションセンサーを有効化
+      </button>
+    </div>
+  </div>
+  
+  <div id="colorPanel">
+    <div class="color-options">
+      <div class="color-option" style="background-color: #2196F3;" data-color="#2196F3"></div>
+      <div class="color-option" style="background-color: #F44336;" data-color="#F44336"></div>
+      <div class="color-option" style="background-color: #4CAF50;" data-color="#4CAF50"></div>
+      <div class="color-option" style="background-color: #FFC107;" data-color="#FFC107"></div>
+      <div class="color-option" style="background-color: #9C27B0;" data-color="#9C27B0"></div>
+    </div>
+  </div>
+  
   <a-scene embedded>
     <a-assets></a-assets>
     <a-camera position="0 1.6 0"></a-camera>
-    <a-box id="blueBox" position="0 1 -3" material="color: blue;" visible="false"></a-box>
+    <a-box id="arObject" position="0 1 -3" material="color: #2196F3;" visible="false"></a-box>
   </a-scene>
+  
   <script>
+    // 要素の取得
     const video = document.getElementById('videoBackground');
     const startButton = document.getElementById('startButton');
     const enableMotionButton = document.getElementById('enableMotionButton');
-    const box = document.getElementById('blueBox');
-    const scene = document.querySelector('a-scene');
+    const startScreen = document.getElementById('startScreen');
+    const controlPanel = document.getElementById('controlPanel');
+    const arObject = document.getElementById('arObject');
     const statusMessage = document.getElementById('statusMessage');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    const colorSelectBtn = document.getElementById('colorSelectBtn');
+    const colorPanel = document.getElementById('colorPanel');
+    const resetPositionBtn = document.getElementById('resetPositionBtn');
+    const colorOptions = document.querySelectorAll('.color-option');
     
     // モーションセンサーの許可をリクエストする関数
     async function requestMotionPermission() {
@@ -126,7 +314,7 @@
         return true;
       } catch (err) {
         console.error("センサーアクセスエラー:", err);
-        showMessage("モーションセンサーへのアクセスに失敗しました。設定を確認してください。");
+        showMessage("モーションセンサーへのアクセスに失敗しました");
         return false;
       }
     }
@@ -156,26 +344,30 @@
     }
     
     // メッセージを表示する関数
-    function showMessage(text, duration = 5000) {
+    function showMessage(text, duration = 3000) {
       statusMessage.textContent = text;
       statusMessage.style.display = 'block';
+      statusMessage.style.opacity = '1';
       
-      // 指定時間後にメッセージを消す
+      // 指定時間後にメッセージをフェードアウト
       if (duration > 0) {
         setTimeout(() => {
-          statusMessage.style.display = 'none';
+          statusMessage.style.opacity = '0';
+          setTimeout(() => {
+            statusMessage.style.display = 'none';
+          }, 300);
         }, duration);
       }
     }
     
     // ローディングインジケーターを表示/非表示する関数
     function showLoading(show) {
-      loadingIndicator.style.display = show ? 'block' : 'none';
+      loadingIndicator.style.display = show ? 'flex' : 'none';
     }
     
     // デバイスの向きに応じて3Dオブジェクトを更新する関数
     function handleDeviceOrientation(event) {
-      if (!event || !box.getAttribute('visible')) return;
+      if (!event || !arObject.getAttribute('visible')) return;
       
       // デバイスの向きに基づいて3Dオブジェクトの位置を調整
       const tiltLR = event.gamma; // 左右の傾き (-90〜90)
@@ -184,7 +376,13 @@
       // 箱の位置を更新（制限付き）
       const x = Math.max(-3, Math.min(3, tiltLR / 30));
       const y = Math.max(0, Math.min(3, 1 + tiltFB / 30));
-      box.setAttribute('position', {x: x, y: y, z: -3});
+      arObject.setAttribute('position', {x: x, y: y, z: -3});
+    }
+    
+    // 3Dオブジェクトの位置をリセットする関数
+    function resetObjectPosition() {
+      arObject.setAttribute('position', {x: 0, y: 1, z: -3});
+      showMessage("位置をリセットしました");
     }
     
     // モーションセンサーを有効化する関数
@@ -195,10 +393,10 @@
       if (motionGranted) {
         // モーションセンサーのイベントリスナーを追加
         window.addEventListener('deviceorientation', handleDeviceOrientation);
-        showMessage('モーションセンサーが有効になりました。デバイスを動かして青い箱を移動させてみてください。');
+        showMessage('モーションセンサーが有効になりました');
         enableMotionButton.style.display = 'none';
       } else {
-        showMessage('モーションセンサーを有効にできませんでした。');
+        showMessage('モーションセンサーを有効にできませんでした');
       }
       
       showLoading(false);
@@ -222,26 +420,28 @@
         });
         
         if (isFrontCamera) {
-          showMessage('背面カメラにアクセスできないため、前面カメラを使用しています。');
+          showMessage('前面カメラを使用しています');
         } else {
-          showMessage('カメラを起動しました。');
+          showMessage('カメラを起動しました');
         }
         
-        // アプリを表示
-        box.setAttribute('visible', 'true');  // キューブ表示
-        startButton.style.display = 'none';   // ボタン非表示
-        showLoading(false);
+        // UI表示
+        startScreen.style.display = 'none';
+        controlPanel.style.display = 'block';
         
-        // モーションセンサーを有効化するボタンを表示
-        // iOS Safariなどモーションセンサー許可が必要なデバイスの場合のみ
+        // 3Dオブジェクトを表示
+        arObject.setAttribute('visible', 'true');
+        
+        // モーションセンサーボタンの表示条件
         if (typeof DeviceMotionEvent !== 'undefined' && 
             typeof DeviceMotionEvent.requestPermission === 'function') {
           enableMotionButton.style.display = 'block';
-          showMessage('箱を動かすにはモーションセンサーを有効化してください。', 0);
         } else {
-          // 他のブラウザでは自動的にモーションセンサーを有効化
+          // 許可が不要なブラウザでは自動的にモーションセンサーを有効化
           window.addEventListener('deviceorientation', handleDeviceOrientation);
         }
+        
+        showLoading(false);
         
       } catch (err) {
         console.error("アプリ起動エラー:", err);
@@ -250,25 +450,45 @@
       }
     }
     
-    // スタートボタンのクリックイベント
-    startButton.addEventListener('click', startApp);
-    
-    // モーションセンサー有効化ボタンのクリックイベント
-    enableMotionButton.addEventListener('click', enableMotionSensor);
-    
-    // タップで箱の色を変更するイベント
-    document.addEventListener('click', (event) => {
-      // ボタンクリック時は色変更しない
-      if (event.target === startButton || event.target === enableMotionButton) {
-        return;
+    // カラーパネルの表示/非表示を切り替える
+    function toggleColorPanel() {
+      if (colorPanel.style.display === 'block') {
+        colorPanel.style.display = 'none';
+      } else {
+        colorPanel.style.display = 'block';
       }
+    }
+    
+    // 3Dオブジェクトの色を変更する
+    function changeObjectColor(color) {
+      arObject.setAttribute('material', 'color', color);
+      colorPanel.style.display = 'none';
       
-      if (box.getAttribute('visible')) {
-        // ランダムな色を生成
-        const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
-        box.setAttribute('material', 'color', randomColor);
-      }
+      // アクティブなクラスを更新
+      colorOptions.forEach(option => {
+        if (option.dataset.color === color) {
+          option.classList.add('active');
+        } else {
+          option.classList.remove('active');
+        }
+      });
+    }
+    
+    // イベントリスナーの設定
+    startButton.addEventListener('click', startApp);
+    enableMotionButton.addEventListener('click', enableMotionSensor);
+    colorSelectBtn.addEventListener('click', toggleColorPanel);
+    resetPositionBtn.addEventListener('click', resetObjectPosition);
+    
+    // カラーオプションのクリックイベント
+    colorOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        changeObjectColor(option.dataset.color);
+      });
     });
+    
+    // 最初のカラーオプションをアクティブに
+    colorOptions[0].classList.add('active');
   </script>
 </body>
 </html>
