@@ -90,6 +90,8 @@
         // iOS 13+でのモーションセンサー許可リクエスト
         if (typeof DeviceMotionEvent !== 'undefined' && 
             typeof DeviceMotionEvent.requestPermission === 'function') {
+          
+          showMessage("モーションセンサーへのアクセスを許可してください");
           const motionPermission = await DeviceMotionEvent.requestPermission();
           
           // 方向センサーも許可リクエスト
@@ -102,12 +104,38 @@
             console.warn("モーションセンサーの使用が許可されていません");
             return false;
           }
+          return true;
         }
+        // 許可リクエストが不要なブラウザの場合はtrueを返す
         return true;
       } catch (err) {
         console.error("センサーアクセスエラー:", err);
         showMessage("モーションセンサーへのアクセスに失敗しました。設定を確認してください。");
         return false;
+      }
+    }
+    
+    // カメラアクセスの許可をリクエストする関数
+    async function requestCameraPermission() {
+      try {
+        showMessage("カメラへのアクセスを許可してください");
+        // まず背面カメラを試す
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } }
+          });
+          return { stream, isFrontCamera: false };
+        } catch (backCameraErr) {
+          // 背面カメラが失敗したら前面カメラを試す
+          console.warn("背面カメラアクセスエラー:", backCameraErr);
+          const frontStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" }
+          });
+          return { stream: frontStream, isFrontCamera: true };
+        }
+      } catch (err) {
+        console.error("カメラアクセスエラー:", err);
+        throw new Error("カメラへのアクセスができません");
       }
     }
     
@@ -132,7 +160,6 @@
       if (!event || !box.getAttribute('visible')) return;
       
       // デバイスの向きに基づいて3Dオブジェクトの位置を調整
-      // 簡易的な実装として、デバイスの向きに応じて箱を移動させる
       const tiltLR = event.gamma; // 左右の傾き (-90〜90)
       const tiltFB = event.beta;  // 前後の傾き (-180〜180)
       
@@ -142,69 +169,52 @@
       box.setAttribute('position', {x: x, y: y, z: -3});
     }
     
-    // スタートボタンのクリックイベント
-    startButton.addEventListener('click', async () => {
+    // アプリを開始する関数
+    async function startApp() {
       showLoading(true);
       
       try {
-        // モーションセンサーの許可をリクエスト
-        const motionGranted = await requestMotionPermission();
+        // ステップ1: カメラの許可を取得
+        const { stream, isFrontCamera } = await requestCameraPermission();
         
-        // カメラ許可リクエスト（背面カメラ）
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { exact: "environment" } }
-          });
-          
-          video.srcObject = stream;
+        video.srcObject = stream;
+        await new Promise(resolve => {
           video.onloadedmetadata = () => {
             video.play();
             video.style.display = 'block';
-            box.setAttribute('visible', 'true');  // キューブ表示
-            startButton.style.display = 'none';   // ボタン非表示
-            showLoading(false);
-            
-            if (!motionGranted) {
-              // センサー許可がない場合のメッセージを表示
-              showMessage('モーションセンサーへのアクセスが許可されていないため、一部機能が制限されています。');
-            } else {
-              // モーションセンサーのイベントリスナーを追加
-              window.addEventListener('deviceorientation', handleDeviceOrientation);
-              showMessage('準備完了！デバイスを動かして青い箱を移動させてみてください。');
-            }
+            resolve();
           };
-        } catch (cameraErr) {
-          // 背面カメラが利用できない場合のフォールバック：前面カメラを使用
-          console.warn("背面カメラアクセスエラー、前面カメラを試します:", cameraErr);
-          
-          try {
-            const frontStream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: "user" }
-            });
-            
-            video.srcObject = frontStream;
-            video.onloadedmetadata = () => {
-              video.play();
-              video.style.display = 'block';
-              box.setAttribute('visible', 'true');
-              startButton.style.display = 'none';
-              showLoading(false);
-              showMessage('背面カメラにアクセスできないため、前面カメラを使用しています。');
-              
-              if (motionGranted) {
-                window.addEventListener('deviceorientation', handleDeviceOrientation);
-              }
-            };
-          } catch (frontCameraErr) {
-            throw new Error("カメラへのアクセスができません");
-          }
+        });
+        
+        if (isFrontCamera) {
+          showMessage('背面カメラにアクセスできないため、前面カメラを使用しています。');
         }
-      } catch (err) {
-        console.error("アクセスエラー:", err);
+        
+        // ステップ2: モーションセンサーの許可を取得
+        const motionGranted = await requestMotionPermission();
+        
+        // アプリを表示
+        box.setAttribute('visible', 'true');  // キューブ表示
+        startButton.style.display = 'none';   // ボタン非表示
         showLoading(false);
-        showMessage("カメラまたはセンサーアクセスに失敗しました。設定を確認してください。");
+        
+        if (motionGranted) {
+          // モーションセンサーのイベントリスナーを追加
+          window.addEventListener('deviceorientation', handleDeviceOrientation);
+          showMessage('準備完了！デバイスを動かして青い箱を移動させてみてください。');
+        } else {
+          showMessage('モーションセンサーへのアクセスが許可されていないため、一部機能が制限されています。');
+        }
+        
+      } catch (err) {
+        console.error("アプリ起動エラー:", err);
+        showLoading(false);
+        showMessage("アプリの起動に失敗しました: " + err.message);
       }
-    });
+    }
+    
+    // スタートボタンのクリックイベント
+    startButton.addEventListener('click', startApp);
     
     // タップで箱の色を変更するイベント
     document.addEventListener('click', () => {
