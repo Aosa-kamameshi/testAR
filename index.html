@@ -1,88 +1,192 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
-    <meta charset="utf-8">
-    <title>WebAR Sample</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Color Change AR App</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: sans-serif;
+      }
 
-    <!-- CSS -->
-    <link rel="stylesheet" href="./indexStyle.css">
+      #start-screen, #permission-screen {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+      }
 
-    <!-- A-Frame & AR.js -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.2/aframe/build/aframe-ar.min.js"></script>
-    
+      #permission-screen {
+        display: none;
+      }
+
+      #color-buttons {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 5;
+      }
+
+      .color-button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .color-button:hover {
+        transform: scale(1.2);
+      }
+
+      #reset-button {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.7);
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        z-index: 5;
+        font-weight: bold;
+      }
+
+      #log {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.5);
+        color: white;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        z-index: 5;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
   </head>
-  <body style="margin: 0; overflow: hidden;">
-
-    <!-- スタートオーバーレイ -->
-    <div id="start-overlay">
-      <button id="start-button">スタート</button>
+  <body>
+    <!-- スタート画面 -->
+    <div id="start-screen">
+      <h1>Color ARへようこそ！</h1>
+      <button onclick="startExperience()">スタート</button>
     </div>
 
-    <!-- ARシーンをあとで生成 -->
-    <div id="scene-container"></div>
+    <!-- 許可画面 -->
+    <div id="permission-screen">
+      <p>モーションセンサーとカメラのアクセス許可を求めています...</p>
+    </div>
+
+    <!-- 色変更ボタン -->
+    <div id="color-buttons" class="hidden">
+      <div class="color-button" style="background: red;" onclick="changeColor('red')"></div>
+      <div class="color-button" style="background: green;" onclick="changeColor('green')"></div>
+      <div class="color-button" style="background: blue;" onclick="changeColor('blue')"></div>
+      <div class="color-button" style="background: yellow;" onclick="changeColor('yellow')"></div>
+    </div>
+
+    <!-- リセットボタン -->
+    <button id="reset-button" class="hidden" onclick="resetColor()">リセット</button>
+
+    <!-- ログ表示 -->
+    <div id="log" class="hidden">準備完了</div>
+
+    <!-- ARシーン -->
+    <a-scene embedded>
+      <a-entity camera></a-entity>
+      <a-entity position="0 1.6 -3">
+        <a-box 
+          id="color-box"
+          position="0 0.5 0" 
+          depth="1" 
+          height="1" 
+          width="1" 
+          color="#4CC3D9" 
+          shadow
+          event-set__enter="_event: mouseenter; color: #24CAFF"
+          event-set__leave="_event: mouseleave; color: #4CC3D9"
+        ></a-box>
+      </a-entity>
+    </a-scene>
 
     <script>
-      const logAndAlert = (msg) => {
-        console.log(msg);
-        alert(msg);
-      };
+      const startScreen = document.getElementById("start-screen");
+      const permissionScreen = document.getElementById("permission-screen");
+      const colorButtons = document.getElementById("color-buttons");
+      const resetButton = document.getElementById("reset-button");
+      const log = document.getElementById("log");
 
-      document.getElementById('start-button').addEventListener('click', async () => {
-        // iOS モーションセンサー許可
-        if (typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-          try {
-            const permissionState = await DeviceOrientationEvent.requestPermission();
-            if (permissionState !== 'granted') {
-              logAndAlert('センサーの使用が許可されませんでした。');
-              return;
-            }
-          } catch (err) {
-            logAndAlert('センサー許可の取得に失敗しました。');
+      function startExperience() {
+        startScreen.style.display = "none";
+        permissionScreen.style.display = "flex";
+
+        // モーションセンサーの許可
+        if (typeof DeviceMotionEvent.requestPermission === "function") {
+          DeviceMotionEvent.requestPermission()
+            .then((response) => {
+              if (response === "granted") {
+                console.log("モーションセンサー許可OK");
+                askCameraAccess();
+              } else {
+                alert("モーションセンサーの許可が必要です。");
+              }
+            })
+            .catch(console.error);
+        } else {
+          askCameraAccess(); // iOS以外
+        }
+      }
+
+      function askCameraAccess() {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then((stream) => {
+            console.log("カメラ許可OK");
+            showUI();
+          })
+          .catch((err) => {
+            alert("カメラへのアクセスが拒否されました。");
             console.error(err);
-            return;
-          }
-        }
+          });
+      }
 
-        // カメラ許可
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop()); // 使用せず解放
-        } catch (err) {
-          logAndAlert('カメラの使用が許可されませんでした。');
-          console.error(err);
-          return;
-        }
+      function showUI() {
+        permissionScreen.style.display = "none";
+        colorButtons.classList.remove("hidden");
+        resetButton.classList.remove("hidden");
+        log.classList.remove("hidden");
+        log.textContent = "色を選んでボックスを変更しよう！";
+      }
 
-        // 許可成功 → スタートオーバーレイ非表示
-        document.getElementById('start-overlay').style.display = 'none';
+      function changeColor(color) {
+        const box = document.getElementById("color-box");
+        box.setAttribute("color", color);
+        log.textContent = `ボックスの色を「${color}」に変更しました`;
+      }
 
-        // ARシーンを挿入（DOM遅延防止）
-        document.getElementById('scene-container').innerHTML = `
-          <a-scene
-            embedded
-            vr-mode-ui="enabled: false"
-            arjs="sourceType: webcam; debugUIEnabled: false;"
-          >
-            <a-assets>
-              <a-asset-item id="myModel" src="untitled.glb"></a-asset-item>
-            </a-assets>
-
-            <a-marker preset="custom" type="pattern" url="pattern-pikachu.patt">
-              <a-entity 
-                gltf-model="#myModel"
-                scale="0.1 0.1 0.1"
-                position="0 0 0"
-                animation-mixer>
-              </a-entity>
-            </a-marker>
-
-            <a-entity camera></a-entity>
-          </a-scene>
-        `;
-      });
+      function resetColor() {
+        const box = document.getElementById("color-box");
+        box.setAttribute("color", "#4CC3D9");
+        log.textContent = "色をリセットしました";
+      }
     </script>
   </body>
 </html>
