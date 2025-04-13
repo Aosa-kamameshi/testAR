@@ -12,6 +12,7 @@ const colorPanel = document.getElementById('colorPanel');
 const resetPositionBtn = document.getElementById('resetPositionBtn');
 const colorOptions = document.querySelectorAll('.color-option');
 const switchCameraBtn = document.getElementById('switchCameraBtn');
+const arContainer = document.getElementById('arContainer');
 
 // カメラの状態を追跡
 let currentStream = null;
@@ -80,8 +81,13 @@ async function requestCameraPermission(preferFront = false) {
     const facingMode = preferFront ? "user" : { exact: "environment" };
     
     try {
+      // モバイルデバイスではビデオの制約を追加
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode }
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: window.innerWidth },
+          height: { ideal: window.innerHeight }
+        }
       });
       
       // 複数カメラがあるか確認
@@ -97,7 +103,11 @@ async function requestCameraPermission(preferFront = false) {
       const alternativeFacingMode = preferFront ? { exact: "environment" } : "user";
       
       const alternativeStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: alternativeFacingMode }
+        video: { 
+          facingMode: alternativeFacingMode,
+          width: { ideal: window.innerWidth },
+          height: { ideal: window.innerHeight }
+        }
       });
       
       return { stream: alternativeStream, isFrontCamera: !preferFront };
@@ -211,16 +221,20 @@ async function startApp() {
     await new Promise(resolve => {
       video.onloadedmetadata = () => {
         video.play().then(() => {
+          // ビデオが再生されたことを確認して表示
+          video.style.display = 'block';
           resolve();
         }).catch(error => {
           console.error("ビデオ再生エラー:", error);
+          // エラーが発生しても進める
+          video.style.display = 'block';
           resolve();
         });
       };
     });
     
-    // カメラ表示
-    video.style.display = 'block';
+    // ARコンテナの表示
+    arContainer.style.display = 'block';
     
     if (isFrontCamera) {
       showMessage('前面カメラを使用しています');
@@ -295,11 +309,29 @@ colorOptions.forEach(option => {
 
 // 画面の向きが変わったときにビデオサイズを調整
 window.addEventListener('resize', () => {
-  // 必要に応じてビデオサイズを調整
-  if (video.style.display !== 'none') {
-    // リサイズ処理
+  // ビデオサイズを画面サイズに合わせる
+  if (video.style.display !== 'none' && currentStream) {
+    // 現在のストリームのトラックを取得
+    const videoTrack = currentStream.getVideoTracks()[0];
+    if (videoTrack) {
+      // 必要に応じて制約を更新
+      const constraints = {
+        width: { ideal: window.innerWidth },
+        height: { ideal: window.innerHeight }
+      };
+      
+      videoTrack.applyConstraints(constraints).catch(err => {
+        console.warn("リサイズ制約適用エラー:", err);
+      });
+    }
   }
 });
 
 // 最初のカラーオプションをアクティブに
 colorOptions[0].classList.add('active');
+
+// SafariでのARコンテナの初期表示を修正
+document.addEventListener('DOMContentLoaded', () => {
+  // ARコンテナの表示を一旦非表示にする
+  arContainer.style.display = 'none';
+});
