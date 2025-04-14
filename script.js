@@ -24,11 +24,34 @@ let motionSensorEnabled = false;
 let isAppStarted = false;
 let videoTrack = null;
 
+// --- 修正済み再帰制御フラグ ---
+let visibilityCheckScheduled = false;
+
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
 
 // A-Frameシーンへの参照を保持
 let aframeScene = null;
+
+// --- 修正済み箇所 ---
+function checkCubeVisibility() {
+    if (isAppStarted && isCubeVisible) {
+      const actualVisibility = arObject.getAttribute('visible');
+      if (actualVisibility === false || actualVisibility === 'false') {
+        console.log("キューブが非表示になっているので再表示します");
+        ensureCubeVisible();
+      }
+    }
+  
+    if (!visibilityCheckScheduled) {
+      visibilityCheckScheduled = true;
+      setTimeout(() => {
+        visibilityCheckScheduled = false; // スケジュールをリセット
+        requestAnimationFrame(checkCubeVisibility);
+      }, 1000); // 1秒ごとにチェック
+    }
+  }
+  
 
 // モーションセンサーの許可をリクエストする関数
 async function requestMotionPermission() {
@@ -444,117 +467,73 @@ function initAframeScene() {
   ensureCubeVisible();
 }
 
-// アプリを開始する関数
+// --- アプリ起動時の関数 ---
 async function startApp() {
-  if (isAppStarted) return;
+    if (isAppStarted) return;
   
-  showLoading(true);
+    showLoading(true);
   
-  try {
-    // カメラの許可を取得
-    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
-    
-    // グローバル変数を更新
-    currentStream = stream;
-    isFrontCamera = newIsFrontCamera;
-    
-    // ビデオ要素に新しいストリームを設定
-    video.srcObject = stream;
-    
-    // 前面カメラの場合はミラーリングを適用
-    video.classList.toggle('mirror-mode', isFrontCamera);
-    
-    await new Promise(resolve => {
-      video.onloadedmetadata = () => {
-        video.play().then(() => {
-          // ビデオが再生されたことを確認して表示
-          video.style.display = 'block';
-          
-          // ビデオサイズを調整
-          adjustVideoSize();
-          
-          resolve();
-        }).catch(error => {
-          console.error("ビデオ再生エラー:", error);
-          // エラーが発生しても進める
-          video.style.display = 'block';
-          resolve();
-        });
-      };
-    });
-    
-    // A-Frameシーンの初期化
-    initAframeScene();
-    
-    // ARコンテナの表示
-    arContainer.style.display = 'block';
-    
-    // カメラ情報表示
-    if (isFrontCamera) {
-      showMessage('前面カメラを使用しています');
-    } else {
-      showMessage('背面カメラを使用しています');
-    }
-    
-    // UI表示
-    startScreen.style.display = 'none';
-    controlPanel.style.display = 'block';
-    
-    // アプリが開始されたことをマーク
-    isAppStarted = true;
-    
-    // キューブを表示
-    ensureCubeVisible();
-    
-    // トグルボタンのアイコンを更新
-    const icon = toggleCubeBtn.querySelector('i');
-    icon.classList.remove('fa-cube');
-    icon.classList.add('fa-eye-slash');
-    
-    // モーションセンサーボタンの表示条件
-    if (isMotionSupported) {
-      if (typeof DeviceMotionEvent !== 'undefined' && 
-          typeof DeviceMotionEvent.requestPermission === 'function') {
-        // iOS 13+の場合は明示的な許可が必要
-        enableMotionButton.style.display = 'block';
+    try {
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+      video.srcObject = stream;
+      video.classList.toggle('mirror-mode', isFrontCamera);
+  
+      await new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          video.play().then(() => {
+            video.style.display = 'block';
+            adjustVideoSize();
+            resolve();
+          }).catch(error => {
+            console.error("ビデオ再生エラー:", error);
+            video.style.display = 'block';
+            resolve();
+          });
+        };
+      });
+  
+      initAframeScene();
+      arContainer.style.display = 'block';
+  
+      if (isFrontCamera) {
+        showMessage('前面カメラを使用しています');
       } else {
-        // 他のブラウザでは自動的にモーションセンサーを有効化を試みる
-        enableMotionButton.style.display = 'block';
-        
-        // Android Chromeなどでは直接試みる
-        try {
-          // テスト用のリスナーを追加して権限状況を確認
-          const tempListener = (event) => {
-            window.removeEventListener('deviceorientation', tempListener);
-            // 実際にデータを受け取れた場合は自動的に有効化
-            if (event && (event.alpha !== null || event.beta !== null || event.gamma !== null)) {
-              enableMotionSensor();
-            }
-          };
-          
-          window.addEventListener('deviceorientation', tempListener, { once: true });
-        } catch (err) {
-          console.warn("自動モーションセンサー検出エラー:", err);
-        }
+        showMessage('背面カメラを使用しています');
       }
-    } else {
-      enableMotionButton.style.display = 'none';
-      showMessage("このデバイスではモーションセンサーがサポートされていません");
+  
+      startScreen.style.display = 'none';
+      controlPanel.style.display = 'block';
+      isAppStarted = true;
+  
+      ensureCubeVisible();
+      const icon = toggleCubeBtn.querySelector('i');
+      icon.classList.remove('fa-cube');
+      icon.classList.add('fa-eye-slash');
+  
+      if (isMotionSupported) {
+        if (typeof DeviceMotionEvent !== 'undefined' && 
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          enableMotionButton.style.display = 'block';
+        } else {
+          enableMotionButton.style.display = 'block';
+        }
+      } else {
+        enableMotionButton.style.display = 'none';
+        showMessage("このデバイスではモーションセンサーがサポートされていません");
+      }
+  
+      showLoading(false);
+  
+      // --- 修正済み関数を呼び出し ---
+      checkCubeVisibility();
+  
+    } catch (err) {
+      console.error("アプリ起動エラー:", err);
+      showLoading(false);
+      showMessage("アプリの起動に失敗しました: " + err.message);
     }
-    
-    showLoading(false);
-    
-    // キューブを画面中央に配置
-    setTimeout(() => resetObjectPosition(), 500);
-    
-    // アニメーションフレームを開始（キューブ表示確認用）
-    requestAnimationFrame(checkCubeVisibility);
-    
-  } catch (err) {
-    console.error("アプリ起動エラー:", err);
-    showLoading(false);
-    showMessage("アプリの起動に失敗しました: " + err.message);
-  }
 }
 
 // キューブの表示状態を定期的に確認する関数
