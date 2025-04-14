@@ -653,3 +653,35 @@ window.addEventListener('beforeunload', () => {
     window.removeEventListener('deviceorientation', handleDeviceOrientation);
   }
 });
+
+// --- 画面サイズ取得とシーン調整関数 ---
+function adjustSceneSizeAndPosition() {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+  
+    // a-scene のサイズを調整
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      scene.style.width = `${screenWidth}px`;
+      scene.style.height = `${screenHeight}px`;
+    }
+  
+    // キューブの位置を画面の中央に設定
+    const cube = document.getElementById('arObject');
+    if (cube) {
+      const centerX = 0; // 中心 X 座標 (A-Frame は -3 ~ 3 の範囲)
+      const centerY = 1; // 中心 Y 座標 (1 は高さの目安)
+      const centerZ = -3; // 中心 Z 座標 (カメラからの距離)
+  
+      cube.setAttribute('position', { x: centerX, y: centerY, z: centerZ });
+      console.log("キューブを画面中央に配置しました:", { x: centerX, y: centerY, z: centerZ });
+    }
+  }
+  
+  // --- ウィンドウサイズ変更時に再調整 ---
+  window.addEventListener('resize', adjustSceneSizeAndPosition);
+  
+  // --- アプリ起動時にシーンサイズとキューブ位置を調整 ---
+  document.addEventListener('DOMContentLoaded', () => {
+    adjustSceneSizeAndPosition();
+  });
