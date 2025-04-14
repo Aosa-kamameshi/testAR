@@ -15,97 +15,122 @@ const switchCameraBtn = document.getElementById('switchCameraBtn');
 const arContainer = document.getElementById('arContainer');
 const toggleCubeBtn = document.getElementById('toggleCubeBtn');
 
+
 // カメラの状態を追跡
 let currentStream = null;
 let isFrontCamera = false;
 let hasMultipleCameras = false;
-let isCubeVisible = true; // キューブを表示するように設定
+let isCubeVisible = true;
 let motionSensorEnabled = false;
 let isAppStarted = false;
 let videoTrack = null;
-
-// --- 修正済み再帰制御フラグ ---
-let visibilityCheckScheduled = false;
+let aframeScene = null;
 
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
 
-// A-Frameシーンへの参照を保持
-let aframeScene = null;
-
-// --- 修正済み箇所 ---
-function checkCubeVisibility() {
-    if (isAppStarted && isCubeVisible) {
-      const actualVisibility = arObject.getAttribute('visible');
-      if (actualVisibility === false || actualVisibility === 'false') {
-        console.log("キューブが非表示になっているので再表示します");
-        ensureCubeVisible();
-      }
+// --- Safari対応サイズ調整 ---
+function adjustSceneSize() {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+  
+    // a-sceneとcanvasのサイズを調整
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      scene.style.width = `${screenWidth}px`;
+      scene.style.height = `${screenHeight}px`;
     }
   
-    if (!visibilityCheckScheduled) {
-      visibilityCheckScheduled = true;
-      setTimeout(() => {
-        visibilityCheckScheduled = false; // スケジュールをリセット
-        requestAnimationFrame(checkCubeVisibility);
-      }, 1000); // 1秒ごとにチェック
+    const canvas = document.querySelector('canvas.a-canvas');
+    if (canvas) {
+      canvas.style.width = `${screenWidth}px`;
+      canvas.style.height = `${screenHeight}px`;
     }
-  }
   
-
-// モーションセンサーの許可をリクエストする関数
-async function requestMotionPermission() {
-  try {
-    // iOS 13+でのモーションセンサー許可リクエスト
-    if (typeof DeviceMotionEvent !== 'undefined' && 
-        typeof DeviceMotionEvent.requestPermission === 'function') {
-      
-      const motionPermission = await DeviceMotionEvent.requestPermission();
-      
-      // 方向センサーも許可リクエスト
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const orientationPermission = await DeviceOrientationEvent.requestPermission();
-        
-        if (orientationPermission !== 'granted') {
-          console.warn("方向センサーの使用が許可されていません");
-          return false;
-        }
-      }
-      
-      if (motionPermission !== 'granted') {
-        console.warn("モーションセンサーの使用が許可されていません");
-        return false;
-      }
-      
-      return true;
-    } 
-    
-    // Android またはその他のブラウザでは自動的に権限をリクエスト
-    if (window.DeviceOrientationEvent) {
-      // テスト用のリスナーを追加して権限状況を確認
-      const tempListener = (event) => {
-        window.removeEventListener('deviceorientation', tempListener);
-        // 実際にデータを受け取れるかどうかで権限を推測
-        return (event && (event.alpha !== null || event.beta !== null || event.gamma !== null));
-      };
-      
-      window.addEventListener('deviceorientation', tempListener, { once: true });
-      
-      // 一時的なタイムアウトで権限チェック (推測的手法)
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // 許可リクエストが不要なブラウザの場合はtrueを返す
-      return true;
-    }
-    
-    return true;
-  } catch (err) {
-    console.error("センサーアクセスエラー:", err);
-    showMessage("モーションセンサーへのアクセスに失敗しました");
-    return false;
-  }
+    console.log("シーンとキャンバスのサイズを調整:", { screenWidth, screenHeight });
 }
+
+function centerCube() {
+    const cube = document.getElementById('arObject');
+    if (cube) {
+      cube.setAttribute('position', { x: 0, y: 1, z: -3 });
+      console.log("キューブを画面中央に配置しました");
+    } else {
+      console.error("キューブが見つかりません");
+    }
+}
+
+function initAR() {
+    aframeScene = document.querySelector('a-scene');
+    if (!aframeScene) {
+      console.error("A-Frameシーンが見つかりません");
+      return;
+    }
+  
+    // シーンがロードされたらサイズ調整とキューブの配置
+    aframeScene.addEventListener('loaded', () => {
+      console.log("A-Frameシーンがロードされました");
+      adjustSceneSize();
+      centerCube();
+    });
+  
+    // Safariやモバイルデバイスでの初期化遅延に対応
+    adjustSceneSize();
+    centerCube();
+}
+  
+// モーションセンサーの許可をリクエストする関数
+// スタートボタンイベントの改善
+async function startApp() {
+    if (isAppStarted) return;
+  
+    showLoading(true);
+  
+    try {
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+      video.srcObject = stream;
+      video.classList.toggle('mirror-mode', isFrontCamera);
+  
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          video.style.display = 'block';
+          adjustSceneSize();
+        });
+      };
+  
+      initAR();
+  
+      arContainer.style.display = 'block';
+      startScreen.style.display = 'none';
+      controlPanel.style.display = 'block';
+      isAppStarted = true;
+  
+      showMessage("アプリを開始しました");
+      showLoading(false);
+    } catch (err) {
+      console.error("アプリ起動エラー:", err);
+      showMessage("アプリの起動に失敗しました");
+      showLoading(false);
+    }
+}
+
+  // スタートボタンのイベントリスナーを設定
+startButton.addEventListener('click', startApp);
+
+// --- サイズ変更時のリアルタイム調整 ---
+window.addEventListener('resize', adjustSceneSize);
+
+// --- イベントリスナーの設定 ---
+startButton.addEventListener('click', startApp);
+
+// --- 初期化 ---
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOMがロードされました");
+  adjustSceneSize();
+  centerCube();
+});
 
 // 利用可能なカメラの数を確認する関数
 async function checkAvailableCameras() {
@@ -222,42 +247,56 @@ async function requestCameraPermission(preferFront = false) {
 
 // ビデオ要素のサイズをデバイスに合わせて調整する関数
 function adjustVideoSize() {
-  if (!videoTrack) return;
-  
-  const settings = videoTrack.getSettings();
-  const videoWidth = settings.width;
-  const videoHeight = settings.height;
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  
-  // スクリーンとビデオのアスペクト比を比較
-  const screenAspect = screenWidth / screenHeight;
-  const videoAspect = videoWidth / videoHeight;
-  
-  if (videoAspect > screenAspect) {
-    // ビデオの方が横長の場合は、高さに合わせて横をクロップ
-    const scale = screenHeight / videoHeight;
-    const newWidth = videoWidth * scale;
-    const left = (screenWidth - newWidth) / 2;
+    if (!videoTrack) return;
     
-    video.style.width = `${newWidth}px`;
-    video.style.height = `${screenHeight}px`;
-    video.style.left = `${left}px`;
-    video.style.top = '0px';
-  } else {
-    // ビデオの方が縦長の場合は、幅に合わせて縦をクロップ
-    const scale = screenWidth / videoWidth;
-    const newHeight = videoHeight * scale;
-    const top = (screenHeight - newHeight) / 2;
+    const settings = videoTrack.getSettings();
+    const videoWidth = settings.width || 640;
+    const videoHeight = settings.height || 480;
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
     
-    video.style.width = `${screenWidth}px`;
-    video.style.height = `${newHeight}px`;
-    video.style.left = '0px';
-    video.style.top = `${top}px`;
+    console.log(`ビデオ設定: ${videoWidth}x${videoHeight}, 画面: ${screenWidth}x${screenHeight}`);
+    
+    // スクリーンとビデオのアスペクト比を比較
+    const screenAspect = screenWidth / screenHeight;
+    const videoAspect = videoWidth / videoHeight;
+    
+    if (videoAspect > screenAspect) {
+      // ビデオの方が横長の場合は、高さに合わせて横をクロップ
+      const scale = screenHeight / videoHeight;
+      const newWidth = videoWidth * scale;
+      const left = (screenWidth - newWidth) / 2;
+      
+      video.style.width = `${newWidth}px`;
+      video.style.height = `${screenHeight}px`;
+      video.style.left = `${left}px`;
+      video.style.top = '0px';
+    } else {
+      // ビデオの方が縦長の場合は、幅に合わせて縦をクロップ
+      const scale = screenWidth / videoWidth;
+      const newHeight = videoHeight * scale;
+      const top = (screenHeight - newHeight) / 2;
+      
+      video.style.width = `${screenWidth}px`;
+      video.style.height = `${newHeight}px`;
+      video.style.left = '0px';
+      video.style.top = `${top}px`;
+    }
+    
+    // A-Frameシーンのサイズも同様に調整
+    if (arContainer) {
+      arContainer.style.width = '100vw';
+      arContainer.style.height = '100vh';
+    }
+    
+    // A-Frameのカメラ位置も調整
+    const camera = document.querySelector('a-entity[camera]');
+    if (camera) {
+      camera.setAttribute('position', '0 1.6 0');
+    }
+    
+    console.log(`ビデオサイズ調整: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
   }
-  
-  console.log(`ビデオサイズ調整: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
-}
 
 // メッセージを表示する関数
 function showMessage(text, duration = 3000) {
@@ -286,30 +325,26 @@ async function switchCamera() {
     try {
       showLoading(true);
       const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
-      
-      // ビデオ要素に新しいストリームを設定
+  
       video.srcObject = stream;
       currentStream = stream;
       isFrontCamera = newIsFrontCamera;
-      
-      // 前面カメラの場合はミラーリングを適用
+  
       video.classList.toggle('mirror-mode', isFrontCamera);
-      
-      // カメラのサイズを調整
+  
       videoTrack = stream.getVideoTracks()[0];
       adjustVideoSize();
-      
+  
       showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
       showLoading(false);
-      
-      // カメラ切り替え後にシーンサイズとキューブ位置を調整
-      adjustSceneSizeAndPosition();
+  
+      resetObjectPosition(); // カメラ切り替え後にリセット
     } catch (err) {
       console.error("カメラ切り替えエラー:", err);
       showMessage("カメラの切り替えに失敗しました");
       showLoading(false);
     }
-}
+  }
 
 // キューブの表示/非表示を切り替える関数
 function toggleCube() {
@@ -330,47 +365,35 @@ function toggleCube() {
 }
 
 // キューブを確実に表示する関数
+// ensureCubeVisible 関数の改善
 function ensureCubeVisible() {
-  if (!isCubeVisible) {
-    toggleCube(); // キューブが非表示なら表示に切り替え
-  }
+    if (!isCubeVisible) {
+      isCubeVisible = true;
   
-  // A-Frame要素の可視性を確認
-  const actualVisibility = arObject.getAttribute('visible');
-  if (actualVisibility === false || actualVisibility === 'false') {
-    console.log("キューブが非表示状態なので強制的に表示します");
+      // アイコンの更新
+      const icon = toggleCubeBtn.querySelector('i');
+      icon.classList.remove('fa-cube');
+      icon.classList.add('fa-eye-slash');
+    }
+  
+    // キューブの表示を強制的に有効化
     arObject.setAttribute('visible', true);
-    isCubeVisible = true;
-    
-    // アイコンの更新
-    const icon = toggleCubeBtn.querySelector('i');
-    icon.classList.remove('fa-cube');
-    icon.classList.add('fa-eye-slash');
-  }
   
-  // キューブの位置とスケールを確認して調整
-  const position = arObject.getAttribute('position');
-  if (!position || (position.x === 0 && position.y === 0 && position.z === 0)) {
+    // キューブの位置とスケールをリセット
     resetObjectPosition();
-  }
   
-  // キューブのスケールを確認
-  const scale = arObject.getAttribute('scale');
-  if (!scale || scale.x < 0.3 || scale.y < 0.3 || scale.z < 0.3) {
-    arObject.setAttribute('scale', '0.5 0.5 0.5');
-  }
+    // DOMスタイルでも強制的に表示
+    arObject.style.visibility = 'visible';
+    arObject.style.display = 'block';
   
-  // マテリアルを確実に設定
-  const material = arObject.getAttribute('material');
-  if (!material || !material.color) {
-    arObject.setAttribute('material', 'color: #2196F3; metalness: 0.2; roughness: 0.8;');
+    console.log("キューブの表示を強制的に有効化しました");
   }
-}
 
 // 画面の中央座標を取得する関数
 function getScreenCenter() {
-    // 画面サイズに基づく調整（視覚的な中央に配置するため）
-    return { x: 0, y: 1, z: -3 };
+  // 画面サイズに基づく調整（視覚的な中央に配置するため）
+  // 深さは-3のままで、画面中央に表示されるようにする
+  return { x: 0, y: 1, z: -3 };
 }
 
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
@@ -399,17 +422,15 @@ function handleDeviceOrientation(event) {
 
 // 3Dオブジェクトの位置をリセットする関数（画面中央に配置）
 function resetObjectPosition() {
-    // 画面の中央座標を取得
-    const centerPosition = getScreenCenter();
-    arObject.setAttribute('position', centerPosition);
-    arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
-    arObject.setAttribute('scale', '0.5 0.5 0.5');
-    showMessage("キューブを画面中央に配置しました");
-    
-    // キューブが表示されていることを確認
-    ensureCubeVisible();
-  }
+  const centerPosition = getScreenCenter();
+  arObject.setAttribute('position', centerPosition);
+  arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
+  arObject.setAttribute('scale', '0.5 0.5 0.5');
+  showMessage("キューブを画面中央に配置しました");
   
+  // キューブが表示されていることを確認
+  ensureCubeVisible();
+}
 
 // モーションセンサーを有効化する関数
 async function enableMotionSensor() {
@@ -447,111 +468,159 @@ async function enableMotionSensor() {
 
 // A-Frameシーンの初期化
 function initAframeScene() {
-    aframeScene = document.querySelector('a-scene');
-    if (!aframeScene) {
-      console.error("A-Frameシーンが見つかりません");
-      return;
-    }
-    
-    // A-Frameシーンの設定
-    const camera = aframeScene.querySelector('[camera]');
-    if (camera) {
-      // カメラのlook-controlsを無効に設定
-      camera.setAttribute('look-controls', 'enabled', false);
-    }
-    
-    // ARコンテナと3Dシーンのサイズを画面サイズに合わせる
-    adjustSceneSizeAndPosition();
-    
-    // キューブの初期設定
-    ensureCubeVisible();
+  aframeScene = document.querySelector('a-scene');
+  if (!aframeScene) {
+    console.error("A-Frameシーンが見つかりません");
+    return;
   }
+  
+  // A-Frameシーンの設定
+  const camera = aframeScene.querySelector('[camera]');
+  if (camera) {
+    // カメラのlook-controlsを無効に設定
+    camera.setAttribute('look-controls', 'enabled', false);
+  }
+  
+  // ARコンテナのサイズをウィンドウサイズに合わせる
+  arContainer.style.width = '100vw';
+  arContainer.style.height = '100vh';
+  
+  // キューブの初期設定
+  ensureCubeVisible();
+}
 
-// --- アプリ起動時の関数 ---
+// アプリを開始する関数
 async function startApp() {
-    if (isAppStarted) return;
+  if (isAppStarted) return;
   
-    showLoading(true);
+  showLoading(true);
   
-    try {
-      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
-      currentStream = stream;
-      isFrontCamera = newIsFrontCamera;
-      video.srcObject = stream;
-      video.classList.toggle('mirror-mode', isFrontCamera);
-  
-      await new Promise(resolve => {
-        video.onloadedmetadata = () => {
-          video.play().then(() => {
-            video.style.display = 'block';
-            adjustVideoSize();
-            resolve();
-          }).catch(error => {
-            console.error("ビデオ再生エラー:", error);
-            video.style.display = 'block';
-            resolve();
-          });
-        };
-      });
-  
-      initAframeScene();
-      arContainer.style.display = 'block';
-      
-      // ここで明示的にシーンのサイズと位置を調整
-      adjustSceneSizeAndPosition();
-  
-      if (isFrontCamera) {
-        showMessage('前面カメラを使用しています');
-      } else {
-        showMessage('背面カメラを使用しています');
-      }
-  
-      startScreen.style.display = 'none';
-      controlPanel.style.display = 'block';
-      isAppStarted = true;
-  
-      ensureCubeVisible();
-      const icon = toggleCubeBtn.querySelector('i');
-      icon.classList.remove('fa-cube');
-      icon.classList.add('fa-eye-slash');
-  
-      if (isMotionSupported) {
-        if (typeof DeviceMotionEvent !== 'undefined' && 
-            typeof DeviceMotionEvent.requestPermission === 'function') {
-          enableMotionButton.style.display = 'block';
-        } else {
-          enableMotionButton.style.display = 'block';
-        }
-      } else {
-        enableMotionButton.style.display = 'none';
-        showMessage("このデバイスではモーションセンサーがサポートされていません");
-      }
-  
-      showLoading(false);
-      checkCubeVisibility();
-  
-    } catch (err) {
-      console.error("アプリ起動エラー:", err);
-      showLoading(false);
-      showMessage("アプリの起動に失敗しました: " + err.message);
+  try {
+    // カメラの許可を取得
+    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+    
+    // グローバル変数を更新
+    currentStream = stream;
+    isFrontCamera = newIsFrontCamera;
+    
+    // ビデオ要素に新しいストリームを設定
+    video.srcObject = stream;
+    
+    // 前面カメラの場合はミラーリングを適用
+    video.classList.toggle('mirror-mode', isFrontCamera);
+    
+    await new Promise(resolve => {
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          // ビデオが再生されたことを確認して表示
+          video.style.display = 'block';
+          
+          // ビデオサイズを調整
+          adjustVideoSize();
+          
+          resolve();
+        }).catch(error => {
+          console.error("ビデオ再生エラー:", error);
+          // エラーが発生しても進める
+          video.style.display = 'block';
+          resolve();
+        });
+      };
+    });
+    
+    // A-Frameシーンの初期化
+    initAframeScene();
+    
+    // ARコンテナの表示
+    arContainer.style.display = 'block';
+    
+    // カメラ情報表示
+    if (isFrontCamera) {
+      showMessage('前面カメラを使用しています');
+    } else {
+      showMessage('背面カメラを使用しています');
     }
+    
+    // UI表示
+    startScreen.style.display = 'none';
+    controlPanel.style.display = 'block';
+    
+    // アプリが開始されたことをマーク
+    isAppStarted = true;
+    
+    // キューブを表示
+    ensureCubeVisible();
+    
+    // トグルボタンのアイコンを更新
+    const icon = toggleCubeBtn.querySelector('i');
+    icon.classList.remove('fa-cube');
+    icon.classList.add('fa-eye-slash');
+    
+    // モーションセンサーボタンの表示条件
+    if (isMotionSupported) {
+      if (typeof DeviceMotionEvent !== 'undefined' && 
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        // iOS 13+の場合は明示的な許可が必要
+        enableMotionButton.style.display = 'block';
+      } else {
+        // 他のブラウザでは自動的にモーションセンサーを有効化を試みる
+        enableMotionButton.style.display = 'block';
+        
+        // Android Chromeなどでは直接試みる
+        try {
+          // テスト用のリスナーを追加して権限状況を確認
+          const tempListener = (event) => {
+            window.removeEventListener('deviceorientation', tempListener);
+            // 実際にデータを受け取れた場合は自動的に有効化
+            if (event && (event.alpha !== null || event.beta !== null || event.gamma !== null)) {
+              enableMotionSensor();
+            }
+          };
+          
+          window.addEventListener('deviceorientation', tempListener, { once: true });
+        } catch (err) {
+          console.warn("自動モーションセンサー検出エラー:", err);
+        }
+      }
+    } else {
+      enableMotionButton.style.display = 'none';
+      showMessage("このデバイスではモーションセンサーがサポートされていません");
+    }
+    
+    showLoading(false);
+    
+    // キューブを画面中央に配置
+    setTimeout(() => resetObjectPosition(), 500);
+    
+    // アニメーションフレームを開始（キューブ表示確認用）
+    requestAnimationFrame(checkCubeVisibility);
+    
+  } catch (err) {
+    console.error("アプリ起動エラー:", err);
+    showLoading(false);
+    showMessage("アプリの起動に失敗しました: " + err.message);
+  }
 }
 
 // キューブの表示状態を定期的に確認する関数
+let visibilityCheckScheduled = false;
+
 function checkCubeVisibility() {
   if (isAppStarted && isCubeVisible) {
-    // A-Frameでの実際の表示状態を確認
     const actualVisibility = arObject.getAttribute('visible');
     if (actualVisibility === false || actualVisibility === 'false') {
       console.log("キューブが非表示になっているので再表示します");
       ensureCubeVisible();
     }
   }
-  
-  // 毎秒チェック
-  setTimeout(() => {
-    requestAnimationFrame(checkCubeVisibility);
-  }, 1000);
+
+  if (!visibilityCheckScheduled) {
+    visibilityCheckScheduled = true;
+    setTimeout(() => {
+      requestAnimationFrame(checkCubeVisibility);
+      visibilityCheckScheduled = false;
+    }, 1000);
+  }
 }
 
 // カラーパネルの表示/非表示を切り替える
@@ -596,57 +665,49 @@ colorOptions.forEach(option => {
   });
 });
 
-// ウィンドウのリサイズ時にビデオとARの調整
+let resizeTimeout;
 window.addEventListener('resize', () => {
-    // アプリが開始されている場合のみ調整
-    if (isAppStarted && videoTrack) {
-      // ビデオサイズを画面サイズに合わせる
-      setTimeout(() => {
-        adjustVideoSize();
-        // シーンサイズとキューブ位置を調整
-        adjustSceneSizeAndPosition();
-      }, 300);
-    }
+  if (isAppStarted && videoTrack) {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      adjustVideoSize();
+      resetObjectPosition();
+    }, 300); // 300msの間隔で制御
+  }
 });
-  
 
-// デバイスの向き変更イベント
+let orientationTimeout;
 window.addEventListener('orientationchange', () => {
-    if (isAppStarted && videoTrack) {
-      setTimeout(() => {
-        adjustVideoSize();
-        // シーンサイズとキューブ位置を調整
-        adjustSceneSizeAndPosition();
-      }, 500); // 向き変更後に少し待って調整
-    }
+  if (isAppStarted && videoTrack) {
+    clearTimeout(orientationTimeout);
+    orientationTimeout = setTimeout(() => {
+      adjustVideoSize();
+      resetObjectPosition();
+    }, 500); // 500msの間隔で制御
+  }
 });
-  
 
 // A-Frame のロードが完了したことを確認
 document.addEventListener('DOMContentLoaded', () => {
-    // ARコンテナの表示を一旦非表示にする
-    arContainer.style.display = 'none';
-    
-    // A-Frame のシーンが読み込まれたらシーン参照を保存
-    const scene = document.querySelector('a-scene');
-    aframeScene = scene;
-    
-    if (scene.hasLoaded) {
-      console.log('A-Frameシーンがすでに読み込まれています');
+  // ARコンテナの表示を一旦非表示にする
+  arContainer.style.display = 'none';
+  
+  // A-Frame のシーンが読み込まれたらシーン参照を保存
+  const scene = document.querySelector('a-scene');
+  aframeScene = scene;
+  
+  if (scene.hasLoaded) {
+    console.log('A-Frameシーンがすでに読み込まれています');
+    initAframeScene();
+  } else {
+    scene.addEventListener('loaded', function () {
+      console.log('A-Frameシーンが読み込まれました');
       initAframeScene();
-      // 明示的にシーンサイズとキューブ位置を調整
-      adjustSceneSizeAndPosition();
-    } else {
-      scene.addEventListener('loaded', function () {
-        console.log('A-Frameシーンが読み込まれました');
-        initAframeScene();
-        // 明示的にシーンサイズとキューブ位置を調整
-        adjustSceneSizeAndPosition();
-      });
-    }
-    
-    // 最初のカラーオプションをアクティブに
-    colorOptions[0].classList.add('active');
+    });
+  }
+  
+  // 最初のカラーオプションをアクティブに
+  colorOptions[0].classList.add('active');
 });
 
 // アプリケーションの終了時にリソースを解放
@@ -661,41 +722,49 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-// --- 画面サイズ取得とシーン調整関数 ---
-function adjustSceneSizeAndPosition() {
+// ビデオ要素のサイズをデバイスに合わせて動的に調整する関数
+function adjustVideoSize() {
+    if (!videoTrack) return;
+  
+    const settings = videoTrack.getSettings();
+    const videoWidth = settings.width || 640;
+    const videoHeight = settings.height || 480;
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
   
-    // a-scene のサイズを調整
-    const scene = document.querySelector('a-scene');
-    if (scene) {
-      scene.style.width = `${screenWidth}px`;
-      scene.style.height = `${screenHeight}px`;
+    console.log(`ビデオ設定: ${videoWidth}x${videoHeight}, 画面: ${screenWidth}x${screenHeight}`);
+  
+    // スクリーンとビデオのアスペクト比を比較
+    const screenAspect = screenWidth / screenHeight;
+    const videoAspect = videoWidth / videoHeight;
+  
+    if (videoAspect > screenAspect) {
+      // ビデオの方が横長の場合は、高さに合わせて横をクロップ
+      const scale = screenHeight / videoHeight;
+      const newWidth = videoWidth * scale;
+      const left = (screenWidth - newWidth) / 2;
+  
+      video.style.width = `${newWidth}px`;
+      video.style.height = `${screenHeight}px`;
+      video.style.left = `${left}px`;
+      video.style.top = '0px';
+    } else {
+      // ビデオの方が縦長の場合は、幅に合わせて縦をクロップ
+      const scale = screenWidth / videoWidth;
+      const newHeight = videoHeight * scale;
+      const top = (screenHeight - newHeight) / 2;
+  
+      video.style.width = `${screenWidth}px`;
+      video.style.height = `${newHeight}px`;
+      video.style.left = '0px';
+      video.style.top = `${top}px`;
     }
   
-    // ARコンテナのサイズも合わせて調整
+    // A-Frameシーンのサイズも同様に調整
     if (arContainer) {
-      arContainer.style.width = `${screenWidth}px`;
-      arContainer.style.height = `${screenHeight}px`;
+      arContainer.style.width = '100vw';
+      arContainer.style.height = '100vh';
     }
   
-    // キューブの位置を画面の中央に設定
-    const cube = document.getElementById('arObject');
-    if (cube) {
-      const centerX = 0; // 中心 X 座標 (A-Frame は中心が0)
-      const centerY = 1; // 中心 Y 座標 (1 は高さの目安)
-      const centerZ = -3; // 中心 Z 座標 (カメラからの距離)
-  
-      cube.setAttribute('position', { x: centerX, y: centerY, z: centerZ });
-      console.log("キューブを画面中央に配置しました:", { x: centerX, y: centerY, z: centerZ });
-    }
+    console.log(`ビデオサイズ調整完了: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
   }
-  
-  
-  // --- ウィンドウサイズ変更時に再調整 ---
-  window.addEventListener('resize', adjustSceneSizeAndPosition);
-  
-  // --- アプリ起動時にシーンサイズとキューブ位置を調整 ---
-  document.addEventListener('DOMContentLoaded', () => {
-    adjustSceneSizeAndPosition();
-});
