@@ -105,13 +105,7 @@ async function startApp() {
       showLoading(false);
     }
   }
-  
-  // スタートボタンのイベントリスナーを設定
-  startButton.addEventListener('click', startApp);
-  
-  // スタートボタンのイベントリスナーを設定
-  startButton.addEventListener('click', startApp);
-  
+
   // スタートボタンのイベントリスナーを設定
   startButton.addEventListener('click', startApp);
 
@@ -305,33 +299,29 @@ function showLoading(show) {
 
 // カメラを切り替える関数
 async function switchCamera() {
-  try {
-    showLoading(true);
-    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
-    
-    // ビデオ要素に新しいストリームを設定
-    video.srcObject = stream;
-    currentStream = stream;
-    isFrontCamera = newIsFrontCamera;
-    
-    // 前面カメラの場合はミラーリングを適用
-    video.classList.toggle('mirror-mode', isFrontCamera);
-    
-    // カメラのサイズを調整
-    videoTrack = stream.getVideoTracks()[0];
-    adjustVideoSize();
-    
-    showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
-    showLoading(false);
-    
-    // カメラ切り替え後にキューブの位置をリセット
-    resetObjectPosition();
-  } catch (err) {
-    console.error("カメラ切り替えエラー:", err);
-    showMessage("カメラの切り替えに失敗しました");
-    showLoading(false);
+    try {
+      showLoading(true);
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
+  
+      video.srcObject = stream;
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+  
+      video.classList.toggle('mirror-mode', isFrontCamera);
+  
+      videoTrack = stream.getVideoTracks()[0];
+      adjustVideoSize();
+  
+      showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
+      showLoading(false);
+  
+      resetObjectPosition(); // カメラ切り替え後にリセット
+    } catch (err) {
+      console.error("カメラ切り替えエラー:", err);
+      showMessage("カメラの切り替えに失敗しました");
+      showLoading(false);
+    }
   }
-}
 
 // キューブの表示/非表示を切り替える関数
 function toggleCube() {
@@ -590,20 +580,24 @@ async function startApp() {
 }
 
 // キューブの表示状態を定期的に確認する関数
+let visibilityCheckScheduled = false;
+
 function checkCubeVisibility() {
   if (isAppStarted && isCubeVisible) {
-    // A-Frameでの実際の表示状態を確認
     const actualVisibility = arObject.getAttribute('visible');
     if (actualVisibility === false || actualVisibility === 'false') {
       console.log("キューブが非表示になっているので再表示します");
       ensureCubeVisible();
     }
   }
-  
-  // 毎秒チェック
-  setTimeout(() => {
-    requestAnimationFrame(checkCubeVisibility);
-  }, 1000);
+
+  if (!visibilityCheckScheduled) {
+    visibilityCheckScheduled = true;
+    setTimeout(() => {
+      requestAnimationFrame(checkCubeVisibility);
+      visibilityCheckScheduled = false;
+    }, 1000);
+  }
 }
 
 // カラーパネルの表示/非表示を切り替える
@@ -648,27 +642,25 @@ colorOptions.forEach(option => {
   });
 });
 
-// ウィンドウのリサイズ時にビデオとARの調整
+let resizeTimeout;
 window.addEventListener('resize', () => {
-  // アプリが開始されている場合のみ調整
   if (isAppStarted && videoTrack) {
-    // ビデオサイズを画面サイズに合わせる
-    setTimeout(() => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
       adjustVideoSize();
-      
-      // 画面サイズが変わったらキューブの位置をリセット
       resetObjectPosition();
-    }, 300);
+    }, 300); // 300msの間隔で制御
   }
 });
 
-// デバイスの向き変更イベント
+let orientationTimeout;
 window.addEventListener('orientationchange', () => {
   if (isAppStarted && videoTrack) {
-    setTimeout(() => {
+    clearTimeout(orientationTimeout);
+    orientationTimeout = setTimeout(() => {
       adjustVideoSize();
       resetObjectPosition();
-    }, 500); // 向き変更後に少し待って調整
+    }, 500); // 500msの間隔で制御
   }
 });
 
