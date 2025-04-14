@@ -13,11 +13,13 @@ const resetPositionBtn = document.getElementById('resetPositionBtn');
 const colorOptions = document.querySelectorAll('.color-option');
 const switchCameraBtn = document.getElementById('switchCameraBtn');
 const arContainer = document.getElementById('arContainer');
+const toggleCubeBtn = document.getElementById('toggleCubeBtn');
 
 // カメラの状態を追跡
 let currentStream = null;
 let isFrontCamera = false;
 let hasMultipleCameras = false;
+let isCubeVisible = false;
 
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
@@ -163,9 +165,27 @@ async function switchCamera() {
   }
 }
 
+// キューブの表示/非表示を切り替える関数
+function toggleCube() {
+  isCubeVisible = !isCubeVisible;
+  arObject.setAttribute('visible', isCubeVisible);
+  
+  // アイコンの更新
+  const icon = toggleCubeBtn.querySelector('i');
+  if (isCubeVisible) {
+    icon.classList.remove('fa-cube');
+    icon.classList.add('fa-eye-slash');
+    showMessage("キューブを表示しました");
+  } else {
+    icon.classList.remove('fa-eye-slash');
+    icon.classList.add('fa-cube');
+    showMessage("キューブを非表示にしました");
+  }
+}
+
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
 function handleDeviceOrientation(event) {
-  if (!event || !arObject.getAttribute('visible')) return;
+  if (!event || !isCubeVisible) return;
   
   // デバイスの向きに基づいて3Dオブジェクトの位置を調整
   const tiltLR = event.gamma; // 左右の傾き (-90〜90)
@@ -246,8 +266,7 @@ async function startApp() {
     startScreen.style.display = 'none';
     controlPanel.style.display = 'block';
     
-    // 3Dオブジェクトを表示
-    arObject.setAttribute('visible', 'true');
+    // キューブは最初は非表示のままにする
     
     // モーションセンサーボタンの表示条件
     if (isMotionSupported) {
@@ -299,6 +318,7 @@ enableMotionButton.addEventListener('click', enableMotionSensor);
 colorSelectBtn.addEventListener('click', toggleColorPanel);
 resetPositionBtn.addEventListener('click', resetObjectPosition);
 switchCameraBtn.addEventListener('click', switchCamera);
+toggleCubeBtn.addEventListener('click', toggleCube);
 
 // カラーオプションのクリックイベント
 colorOptions.forEach(option => {
