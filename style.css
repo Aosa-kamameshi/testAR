@@ -23,19 +23,19 @@ body, html {
   width: 100vw;
   height: 100vh;
   object-fit: cover;
-  z-index: 0; /* z-indexを変更 */
+  z-index: 1; /* ビデオを下層に */
   display: none; /* 初期状態は非表示 */
-  background-color: transparent; /* 背景色を透明に */
+  background-color: transparent;
 }
 
-/* ARコンテナスタイルを追加 */
+/* ARコンテナスタイルを修正 */
 #arContainer {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 1;
+  z-index: 2; /* ARを上層に */
   pointer-events: none;
   display: none; /* 初期状態は非表示 */
 }
@@ -49,6 +49,11 @@ a-scene {
   pointer-events: none;
   z-index: 2;
   background: transparent !important;
+}
+
+/* A-Frame要素のスタイルを追加 */
+#arObject {
+  pointer-events: none;
 }
 
 /* ボタンの共通スタイル */
@@ -145,6 +150,7 @@ a-scene {
   backdrop-filter: blur(10px);
   border-radius: 28px;
   padding: 8px;
+  z-index: 20;
 }
 
 .controls {
