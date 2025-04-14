@@ -19,9 +19,10 @@ const toggleCubeBtn = document.getElementById('toggleCubeBtn');
 let currentStream = null;
 let isFrontCamera = false;
 let hasMultipleCameras = false;
-let isCubeVisible = true; // キューブを初期表示するように変更
+let isCubeVisible = true; // キューブを表示するように設定
 let motionSensorEnabled = false;
 let isAppStarted = false;
+let videoTrack = null;
 
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
@@ -58,7 +59,6 @@ async function requestMotionPermission() {
     } 
     
     // Android またはその他のブラウザでは自動的に権限をリクエスト
-    // A-Frameのデフォルト許可リクエストUIを無効にしているので、独自のチェックを実装
     if (window.DeviceOrientationEvent) {
       // テスト用のリスナーを追加して権限状況を確認
       const tempListener = (event) => {
@@ -100,6 +100,38 @@ async function checkAvailableCameras() {
   }
 }
 
+// デバイスの画面サイズに基づいて最適なカメラ解像度を取得
+function getOptimalCameraResolution() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  
+  // デバイス画面のアスペクト比を計算
+  const screenAspectRatio = width / height;
+  
+  // カメラ解像度の計算 - デバイスに最適化
+  let idealWidth, idealHeight;
+  
+  // モバイルデバイスの場合は適切な解像度を設定
+  if (width <= 768) {
+    if (screenAspectRatio >= 1) { // 横向き
+      idealWidth = Math.min(1280, width);
+      idealHeight = Math.floor(idealWidth / screenAspectRatio);
+    } else { // 縦向き
+      idealHeight = Math.min(1280, height);
+      idealWidth = Math.floor(idealHeight * screenAspectRatio);
+    }
+  } else {
+    // デスクトップやタブレットの場合は高解像度を許可
+    idealWidth = Math.min(1920, width);
+    idealHeight = Math.floor(idealWidth / screenAspectRatio);
+  }
+  
+  return {
+    width: { ideal: idealWidth },
+    height: { ideal: idealHeight }
+  };
+}
+
 // カメラアクセスの許可をリクエストする関数
 async function requestCameraPermission(preferFront = false) {
   try {
@@ -111,16 +143,24 @@ async function requestCameraPermission(preferFront = false) {
     showMessage("カメラへのアクセスを許可してください");
     
     const facingMode = preferFront ? "user" : { exact: "environment" };
+    const resolution = getOptimalCameraResolution();
     
     try {
       // モバイルデバイスではビデオの制約を追加
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         video: { 
           facingMode: facingMode,
-          width: { ideal: window.innerWidth },
-          height: { ideal: window.innerHeight }
+          ...resolution,
+          aspectRatio: window.innerWidth / window.innerHeight
         }
-      });
+      };
+      
+      console.log("カメラリクエスト制約:", constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // ビデオトラックを取得
+      videoTrack = stream.getVideoTracks()[0];
+      console.log("取得したビデオトラック設定:", videoTrack.getSettings());
       
       // 複数カメラがあるか確認
       hasMultipleCameras = await checkAvailableCameras();
@@ -134,13 +174,20 @@ async function requestCameraPermission(preferFront = false) {
       console.warn(`${preferFront ? '前面' : '背面'}カメラアクセスエラー:`, err);
       const alternativeFacingMode = preferFront ? { exact: "environment" } : "user";
       
-      const alternativeStream = await navigator.mediaDevices.getUserMedia({
+      const alternativeConstraints = {
         video: { 
           facingMode: alternativeFacingMode,
-          width: { ideal: window.innerWidth },
-          height: { ideal: window.innerHeight }
+          ...resolution,
+          aspectRatio: window.innerWidth / window.innerHeight
         }
-      });
+      };
+      
+      console.log("代替カメラリクエスト制約:", alternativeConstraints);
+      const alternativeStream = await navigator.mediaDevices.getUserMedia(alternativeConstraints);
+      
+      // ビデオトラックを取得
+      videoTrack = alternativeStream.getVideoTracks()[0];
+      console.log("代替ビデオトラック設定:", videoTrack.getSettings());
       
       return { stream: alternativeStream, isFrontCamera: !preferFront };
     }
@@ -148,6 +195,45 @@ async function requestCameraPermission(preferFront = false) {
     console.error("カメラアクセスエラー:", err);
     throw new Error("カメラへのアクセスができません");
   }
+}
+
+// ビデオ要素のサイズをデバイスに合わせて調整する関数
+function adjustVideoSize() {
+  if (!videoTrack) return;
+  
+  const settings = videoTrack.getSettings();
+  const videoWidth = settings.width;
+  const videoHeight = settings.height;
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  
+  // スクリーンとビデオのアスペクト比を比較
+  const screenAspect = screenWidth / screenHeight;
+  const videoAspect = videoWidth / videoHeight;
+  
+  if (videoAspect > screenAspect) {
+    // ビデオの方が横長の場合は、高さに合わせて横をクロップ
+    const scale = screenHeight / videoHeight;
+    const newWidth = videoWidth * scale;
+    const left = (screenWidth - newWidth) / 2;
+    
+    video.style.width = `${newWidth}px`;
+    video.style.height = `${screenHeight}px`;
+    video.style.left = `${left}px`;
+    video.style.top = '0px';
+  } else {
+    // ビデオの方が縦長の場合は、幅に合わせて縦をクロップ
+    const scale = screenWidth / videoWidth;
+    const newHeight = videoHeight * scale;
+    const top = (screenHeight - newHeight) / 2;
+    
+    video.style.width = `${screenWidth}px`;
+    video.style.height = `${newHeight}px`;
+    video.style.left = '0px';
+    video.style.top = `${top}px`;
+  }
+  
+  console.log(`ビデオサイズ調整: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
 }
 
 // メッセージを表示する関数
@@ -186,6 +272,10 @@ async function switchCamera() {
     // 前面カメラの場合はミラーリングを適用
     video.classList.toggle('mirror-mode', isFrontCamera);
     
+    // カメラのサイズを調整
+    videoTrack = stream.getVideoTracks()[0];
+    adjustVideoSize();
+    
     showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
     showLoading(false);
     
@@ -213,6 +303,44 @@ function toggleCube() {
     icon.classList.remove('fa-eye-slash');
     icon.classList.add('fa-cube');
     showMessage("キューブを非表示にしました");
+  }
+}
+
+// キューブを確実に表示する関数
+function ensureCubeVisible() {
+  if (!isCubeVisible) {
+    toggleCube(); // キューブが非表示なら表示に切り替え
+  }
+  
+  // A-Frame要素の可視性を確認
+  const actualVisibility = arObject.getAttribute('visible');
+  if (actualVisibility === false || actualVisibility === 'false') {
+    console.log("キューブが非表示状態なので強制的に表示します");
+    arObject.setAttribute('visible', true);
+    isCubeVisible = true;
+    
+    // アイコンの更新
+    const icon = toggleCubeBtn.querySelector('i');
+    icon.classList.remove('fa-cube');
+    icon.classList.add('fa-eye-slash');
+  }
+  
+  // キューブの位置とスケールを確認して調整
+  const position = arObject.getAttribute('position');
+  if (!position || (position.x === 0 && position.y === 0 && position.z === 0)) {
+    resetObjectPosition();
+  }
+  
+  // キューブのスケールを確認
+  const scale = arObject.getAttribute('scale');
+  if (!scale || scale.x < 0.3 || scale.y < 0.3 || scale.z < 0.3) {
+    arObject.setAttribute('scale', '0.5 0.5 0.5');
+  }
+  
+  // マテリアルを確実に設定
+  const material = arObject.getAttribute('material');
+  if (!material || !material.color) {
+    arObject.setAttribute('material', 'color: #2196F3; metalness: 0.2; roughness: 0.8;');
   }
 }
 
@@ -252,7 +380,11 @@ function resetObjectPosition() {
   const centerPosition = getScreenCenter();
   arObject.setAttribute('position', centerPosition);
   arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
+  arObject.setAttribute('scale', '0.5 0.5 0.5');
   showMessage("キューブを画面中央に配置しました");
+  
+  // キューブが表示されていることを確認
+  ensureCubeVisible();
 }
 
 // モーションセンサーを有効化する関数
@@ -280,10 +412,8 @@ async function enableMotionSensor() {
       console.warn("A-Frameシーンの制御設定エラー:", err);
     }
     
-    // キューブが表示されていなければ自動的に表示する
-    if (!isCubeVisible) {
-      toggleCube();
-    }
+    // キューブを表示
+    ensureCubeVisible();
   } else {
     showMessage('モーションセンサーを有効にできませんでした');
   }
@@ -305,6 +435,13 @@ function initAframeScene() {
     // カメラのlook-controlsを無効に設定
     camera.setAttribute('look-controls', 'enabled', false);
   }
+  
+  // ARコンテナのサイズをウィンドウサイズに合わせる
+  arContainer.style.width = '100vw';
+  arContainer.style.height = '100vh';
+  
+  // キューブの初期設定
+  ensureCubeVisible();
 }
 
 // アプリを開始する関数
@@ -332,6 +469,10 @@ async function startApp() {
         video.play().then(() => {
           // ビデオが再生されたことを確認して表示
           video.style.display = 'block';
+          
+          // ビデオサイズを調整
+          adjustVideoSize();
+          
           resolve();
         }).catch(error => {
           console.error("ビデオ再生エラー:", error);
@@ -348,6 +489,7 @@ async function startApp() {
     // ARコンテナの表示
     arContainer.style.display = 'block';
     
+    // カメラ情報表示
     if (isFrontCamera) {
       showMessage('前面カメラを使用しています');
     } else {
@@ -362,7 +504,7 @@ async function startApp() {
     isAppStarted = true;
     
     // キューブを表示
-    arObject.setAttribute('visible', true);
+    ensureCubeVisible();
     
     // トグルボタンのアイコンを更新
     const icon = toggleCubeBtn.querySelector('i');
@@ -377,8 +519,6 @@ async function startApp() {
         enableMotionButton.style.display = 'block';
       } else {
         // 他のブラウザでは自動的にモーションセンサーを有効化を試みる
-        // しかし、あくまでもユーザージェスチャー後に実行する必要がある場合もあるので、
-        // ボタンは表示しておく
         enableMotionButton.style.display = 'block';
         
         // Android Chromeなどでは直接試みる
@@ -407,11 +547,31 @@ async function startApp() {
     // キューブを画面中央に配置
     setTimeout(() => resetObjectPosition(), 500);
     
+    // アニメーションフレームを開始（キューブ表示確認用）
+    requestAnimationFrame(checkCubeVisibility);
+    
   } catch (err) {
     console.error("アプリ起動エラー:", err);
     showLoading(false);
     showMessage("アプリの起動に失敗しました: " + err.message);
   }
+}
+
+// キューブの表示状態を定期的に確認する関数
+function checkCubeVisibility() {
+  if (isAppStarted && isCubeVisible) {
+    // A-Frameでの実際の表示状態を確認
+    const actualVisibility = arObject.getAttribute('visible');
+    if (actualVisibility === false || actualVisibility === 'false') {
+      console.log("キューブが非表示になっているので再表示します");
+      ensureCubeVisible();
+    }
+  }
+  
+  // 毎秒チェック
+  setTimeout(() => {
+    requestAnimationFrame(checkCubeVisibility);
+  }, 1000);
 }
 
 // カラーパネルの表示/非表示を切り替える
@@ -438,9 +598,7 @@ function changeObjectColor(color) {
   });
   
   // キューブが表示されていなければ表示する
-  if (!isCubeVisible) {
-    toggleCube();
-  }
+  ensureCubeVisible();
 }
 
 // イベントリスナーの設定
@@ -458,28 +616,27 @@ colorOptions.forEach(option => {
   });
 });
 
-// 画面の向きが変わったときにビデオサイズを調整
+// ウィンドウのリサイズ時にビデオとARの調整
 window.addEventListener('resize', () => {
-  // ビデオサイズを画面サイズに合わせる
-  if (video.style.display !== 'none' && currentStream) {
-    // 現在のストリームのトラックを取得
-    const videoTrack = currentStream.getVideoTracks()[0];
-    if (videoTrack) {
-      // 必要に応じて制約を更新
-      const constraints = {
-        width: { ideal: window.innerWidth },
-        height: { ideal: window.innerHeight }
-      };
+  // アプリが開始されている場合のみ調整
+  if (isAppStarted && videoTrack) {
+    // ビデオサイズを画面サイズに合わせる
+    setTimeout(() => {
+      adjustVideoSize();
       
-      videoTrack.applyConstraints(constraints).catch(err => {
-        console.warn("リサイズ制約適用エラー:", err);
-      });
-    }
+      // 画面サイズが変わったらキューブの位置をリセット
+      resetObjectPosition();
+    }, 300);
   }
-  
-  // 画面サイズが変わったらキューブの位置をリセット
-  if (isAppStarted) {
-    setTimeout(() => resetObjectPosition(), 100);
+});
+
+// デバイスの向き変更イベント
+window.addEventListener('orientationchange', () => {
+  if (isAppStarted && videoTrack) {
+    setTimeout(() => {
+      adjustVideoSize();
+      resetObjectPosition();
+    }, 500); // 向き変更後に少し待って調整
   }
 });
 
