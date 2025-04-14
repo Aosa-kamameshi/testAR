@@ -31,58 +31,87 @@ const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEv
 let aframeScene = null;
 
 // モーションセンサーの許可をリクエストする関数
-async function requestMotionPermission() {
-  try {
-    // iOS 13+でのモーションセンサー許可リクエスト
-    if (typeof DeviceMotionEvent !== 'undefined' && 
-        typeof DeviceMotionEvent.requestPermission === 'function') {
-      
-      const motionPermission = await DeviceMotionEvent.requestPermission();
-      
-      // 方向センサーも許可リクエスト
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const orientationPermission = await DeviceOrientationEvent.requestPermission();
-        
-        if (orientationPermission !== 'granted') {
-          console.warn("方向センサーの使用が許可されていません");
-          return false;
+// スタートボタンイベントの改善
+async function startApp() {
+    if (isAppStarted) return;
+  
+    showLoading(true); // ローディングインジケーターを表示
+  
+    try {
+      // カメラの許可をリクエスト
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+  
+      // グローバル変数を更新
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+  
+      // ビデオ要素にストリームを設定
+      video.srcObject = stream;
+  
+      // 前面カメラの場合はミラーリングを適用
+      video.classList.toggle('mirror-mode', isFrontCamera);
+  
+      // ビデオの再生確認
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play().then(() => {
+            video.style.display = 'block';
+            adjustVideoSize(); // デバイスサイズに合わせて調整
+            resolve();
+          }).catch((error) => {
+            console.error("ビデオ再生エラー:", error);
+            video.style.display = 'block';
+            resolve();
+          });
+        };
+      });
+  
+      // A-Frameシーンの初期化
+      initAframeScene();
+  
+      // ARコンテナを表示
+      arContainer.style.display = 'block';
+  
+      // UI表示設定
+      startScreen.style.display = 'none';
+      controlPanel.style.display = 'block';
+  
+      // アプリが開始されたことをマーク
+      isAppStarted = true;
+  
+      // キューブを表示
+      ensureCubeVisible();
+  
+      // UIトグルボタンのアイコン更新
+      const icon = toggleCubeBtn.querySelector('i');
+      icon.classList.remove('fa-cube');
+      icon.classList.add('fa-eye-slash');
+  
+      // モーションセンサーの準備
+      if (isMotionSupported) {
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          enableMotionButton.style.display = 'block';
+        } else {
+          enableMotionSensor(); // 自動的にモーションセンサーを有効化
         }
+      } else {
+        enableMotionButton.style.display = 'none';
+        showMessage("このデバイスではモーションセンサーがサポートされていません");
       }
-      
-      if (motionPermission !== 'granted') {
-        console.warn("モーションセンサーの使用が許可されていません");
-        return false;
-      }
-      
-      return true;
-    } 
-    
-    // Android またはその他のブラウザでは自動的に権限をリクエスト
-    if (window.DeviceOrientationEvent) {
-      // テスト用のリスナーを追加して権限状況を確認
-      const tempListener = (event) => {
-        window.removeEventListener('deviceorientation', tempListener);
-        // 実際にデータを受け取れるかどうかで権限を推測
-        return (event && (event.alpha !== null || event.beta !== null || event.gamma !== null));
-      };
-      
-      window.addEventListener('deviceorientation', tempListener, { once: true });
-      
-      // 一時的なタイムアウトで権限チェック (推測的手法)
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // 許可リクエストが不要なブラウザの場合はtrueを返す
-      return true;
+  
+      // 初期位置にキューブを配置
+      resetObjectPosition();
+  
+      showLoading(false); // ローディングインジケーターを非表示
+    } catch (err) {
+      console.error("アプリ起動エラー:", err);
+      showMessage("アプリの起動に失敗しました: " + err.message);
+      showLoading(false);
     }
-    
-    return true;
-  } catch (err) {
-    console.error("センサーアクセスエラー:", err);
-    showMessage("モーションセンサーへのアクセスに失敗しました");
-    return false;
   }
-}
+  
+  // スタートボタンのイベントリスナーを設定
+  startButton.addEventListener('click', startApp);
 
 // 利用可能なカメラの数を確認する関数
 async function checkAvailableCameras() {
