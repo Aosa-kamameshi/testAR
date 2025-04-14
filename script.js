@@ -19,7 +19,7 @@ const toggleCubeBtn = document.getElementById('toggleCubeBtn');
 let currentStream = null;
 let isFrontCamera = false;
 let hasMultipleCameras = false;
-let isCubeVisible = false;
+let isCubeVisible = true; // キューブを初期表示するように変更
 let motionSensorEnabled = false;
 let isAppStarted = false;
 
@@ -160,6 +160,9 @@ async function switchCamera() {
     
     showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
     showLoading(false);
+    
+    // カメラ切り替え後にキューブの位置をリセット
+    resetObjectPosition();
   } catch (err) {
     console.error("カメラ切り替えエラー:", err);
     showMessage("カメラの切り替えに失敗しました");
@@ -183,6 +186,13 @@ function toggleCube() {
     icon.classList.add('fa-cube');
     showMessage("キューブを非表示にしました");
   }
+}
+
+// 画面の中央座標を取得する関数
+function getScreenCenter() {
+  // 画面サイズに基づく調整（視覚的な中央に配置するため）
+  // 深さは-3のままで、画面中央に表示されるようにする
+  return { x: 0, y: 1, z: -3 };
 }
 
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
@@ -209,11 +219,12 @@ function handleDeviceOrientation(event) {
   });
 }
 
-// 3Dオブジェクトの位置をリセットする関数
+// 3Dオブジェクトの位置をリセットする関数（画面中央に配置）
 function resetObjectPosition() {
-  arObject.setAttribute('position', {x: 0, y: 1, z: -3});
+  const centerPosition = getScreenCenter();
+  arObject.setAttribute('position', centerPosition);
   arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
-  showMessage("位置をリセットしました");
+  showMessage("キューブを画面中央に配置しました");
 }
 
 // モーションセンサーを有効化する関数
@@ -290,6 +301,14 @@ async function startApp() {
     // アプリが開始されたことをマーク
     isAppStarted = true;
     
+    // キューブを表示
+    arObject.setAttribute('visible', true);
+    
+    // トグルボタンのアイコンを更新
+    const icon = toggleCubeBtn.querySelector('i');
+    icon.classList.remove('fa-cube');
+    icon.classList.add('fa-eye-slash');
+    
     // モーションセンサーボタンの表示条件
     if (isMotionSupported) {
       if (typeof DeviceMotionEvent !== 'undefined' && 
@@ -304,8 +323,8 @@ async function startApp() {
     
     showLoading(false);
     
-    // アプリ開始時に自動的にキューブを表示（オプション）
-    // setTimeout(() => toggleCube(), 1000);
+    // キューブを画面中央に配置
+    setTimeout(() => resetObjectPosition(), 500);
     
   } catch (err) {
     console.error("アプリ起動エラー:", err);
@@ -376,6 +395,11 @@ window.addEventListener('resize', () => {
       });
     }
   }
+  
+  // 画面サイズが変わったらキューブの位置をリセット
+  if (isAppStarted) {
+    setTimeout(() => resetObjectPosition(), 100);
+  }
 });
 
 // A-Frame のロードが完了したことを確認
@@ -397,10 +421,9 @@ document.addEventListener('DOMContentLoaded', () => {
   colorOptions[0].classList.add('active');
 });
 
-// シングルタップでもARオブジェクトを表示するための追加リスナー
-document.addEventListener('click', () => {
-  if (isAppStarted && !isCubeVisible) {
-    // アプリが起動済みで、キューブが非表示の場合にタップで表示
-    // toggleCube();
+// アプリケーションの終了時にリソースを解放
+window.addEventListener('beforeunload', () => {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
   }
 });
