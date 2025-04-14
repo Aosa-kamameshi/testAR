@@ -97,23 +97,70 @@ function isSafari() {
         aframeCanvas.style.height = '100%';
       }
     }
-  }
+}
   
-  // 無限ループ解消：キューブの表示状態を確認
-  let cubeVisibilityCheckInterval = null; // 確認用のインターバルID
-  function startCubeVisibilityCheck() {
-    if (cubeVisibilityCheckInterval) return; // 二重起動を防止
-  
-    cubeVisibilityCheckInterval = setInterval(() => {
-      if (isAppStarted && isCubeVisible) {
-        const actualVisibility = arObject.getAttribute('visible');
-        if (actualVisibility === false || actualVisibility === 'false') {
-          console.log("キューブが非表示になっているので再表示します");
-          ensureCubeVisible();
-        }
+// 無限ループ解消：キューブの表示状態を確認
+let cubeVisibilityCheckInterval = null; // 確認用のインターバルID
+
+function startCubeVisibilityCheck() {
+  if (cubeVisibilityCheckInterval) return; // 二重起動を防止
+
+  cubeVisibilityCheckInterval = setInterval(() => {
+    if (isAppStarted && isCubeVisible) {
+      const actualVisibility = arObject.getAttribute('visible');
+      if (actualVisibility === false || actualVisibility === 'false') {
+        console.log("キューブが非表示になっているので再表示します");
+        ensureCubeVisible();
       }
-    }, 1000); // 1秒ごとに確認
+    }
+  }, 1000); // 1秒ごとに確認
+}
+
+function stopCubeVisibilityCheck() {
+  if (cubeVisibilityCheckInterval) {
+    clearInterval(cubeVisibilityCheckInterval);
+    cubeVisibilityCheckInterval = null;
   }
+}
+
+// アプリ起動時にキューブ表示チェックを開始
+async function startApp() {
+  if (isAppStarted) return;
+
+  showLoading(true);
+
+  try {
+    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+    currentStream = stream;
+    isFrontCamera = newIsFrontCamera;
+    video.srcObject = stream;
+    video.classList.toggle('mirror-mode', isFrontCamera);
+
+    video.onloadedmetadata = () => {
+      video.play().then(() => {
+        video.style.display = 'block';
+        adjustVideoSize();
+      });
+    };
+
+    initAframeScene();
+
+    arContainer.style.display = 'block';
+    startScreen.style.display = 'none';
+    controlPanel.style.display = 'block';
+    isAppStarted = true;
+
+    showMessage("アプリを開始しました");
+    showLoading(false);
+
+    startCubeVisibilityCheck(); // キューブ表示監視を開始
+  } catch (err) {
+    console.error("アプリ起動エラー:", err);
+    showMessage("アプリの起動に失敗しました");
+    showLoading(false);
+  }
+}
+
   
   function stopCubeVisibilityCheck() {
     if (cubeVisibilityCheckInterval) {
@@ -743,14 +790,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // アプリケーションの終了時にリソースを解放
 window.addEventListener('beforeunload', () => {
-  if (currentStream) {
-    currentStream.getTracks().forEach(track => track.stop());
-  }
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
   
-  // モーションセンサーのリスナーを削除
-  if (motionSensorEnabled) {
-    window.removeEventListener('deviceorientation', handleDeviceOrientation);
-  }
+    // キューブ表示監視の停止
+    stopCubeVisibilityCheck();
 });
 
 // ビデオ要素のサイズをデバイスに合わせて動的に調整する関数
@@ -798,4 +843,32 @@ function adjustVideoSize() {
     }
   
     console.log(`ビデオサイズ調整完了: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
+}
+
+// Safari環境判定関数
+function isSafari() {
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   }
+  
+  // Safari対応のA-Frameサイズ調整
+  function adjustSceneForSafari() {
+    if (isSafari()) {
+      console.log("Safari環境のため、A-Frameシーンを調整します");
+      const aframeCanvas = document.querySelector('canvas.a-canvas');
+      if (aframeCanvas) {
+        aframeCanvas.style.position = 'absolute';
+        aframeCanvas.style.top = '0';
+        aframeCanvas.style.left = '0';
+        aframeCanvas.style.width = '100%';
+        aframeCanvas.style.height = '100%';
+      }
+    }
+  }
+  
+  // DOMロード後の初期化
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMがロードされました - Safari対応とキューブ監視を初期化");
+  
+    adjustSceneForSafari(); // Safari対応のサイズ調整
+    startCubeVisibilityCheck(); // キューブ表示監視を開始
+  });
