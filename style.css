@@ -91,6 +91,11 @@ a-scene {
   justify-content: center;
 }
 
+/* キューブボタン用のスタイル */
+#toggleCubeBtn.active {
+  background-color: var(--accent-color);
+}
+
 /* UI コンテナ */
 .ui-container {
   position: fixed;
