@@ -32,6 +32,7 @@ let aframeScene = null;
 
 // モーションセンサーの許可をリクエストする関数
 // スタートボタンイベントの改善
+// スタートボタンイベントの改善
 async function startApp() {
     if (isAppStarted) return;
   
@@ -72,8 +73,10 @@ async function startApp() {
       // ARコンテナを表示
       arContainer.style.display = 'block';
   
-      // UI表示設定
+      // スタートスクリーンを完全に非表示
       startScreen.style.display = 'none';
+  
+      // UI表示設定
       controlPanel.style.display = 'block';
   
       // アプリが開始されたことをマーク
@@ -109,6 +112,9 @@ async function startApp() {
       showLoading(false);
     }
   }
+  
+  // スタートボタンのイベントリスナーを設定
+  startButton.addEventListener('click', startApp);
   
   // スタートボタンのイベントリスナーを設定
   startButton.addEventListener('click', startApp);
