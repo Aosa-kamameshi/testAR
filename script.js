@@ -321,39 +321,27 @@ function toggleCube() {
 }
 
 // キューブを確実に表示する関数
+// ensureCubeVisible 関数の改善
 function ensureCubeVisible() {
-    // キューブが非表示なら表示に切り替え
     if (!isCubeVisible) {
       isCubeVisible = true;
-      
+  
       // アイコンの更新
       const icon = toggleCubeBtn.querySelector('i');
       icon.classList.remove('fa-cube');
       icon.classList.add('fa-eye-slash');
     }
-    
-    // A-Frame要素の可視性を確認して強制的に表示に設定
+  
+    // キューブの表示を強制的に有効化
     arObject.setAttribute('visible', true);
-    
-    // キューブの位置を確認して調整
-    const position = arObject.getAttribute('position');
-    if (!position || (position.x === 0 && position.y === 0 && position.z === 0)) {
-      resetObjectPosition();
-    }
-    
-    // キューブのスケールを確認して調整
-    const scale = arObject.getAttribute('scale');
-    if (!scale || scale.x < 0.3 || scale.y < 0.3 || scale.z < 0.3) {
-      arObject.setAttribute('scale', '0.5 0.5 0.5');
-    }
-    
-    // マテリアルを確実に設定
-    arObject.setAttribute('material', 'color: #2196F3; metalness: 0.2; roughness: 0.8;');
-    
+  
+    // キューブの位置とスケールをリセット
+    resetObjectPosition();
+  
     // DOMスタイルでも強制的に表示
     arObject.style.visibility = 'visible';
     arObject.style.display = 'block';
-    
+  
     console.log("キューブの表示を強制的に有効化しました");
   }
 
@@ -687,3 +675,50 @@ window.addEventListener('beforeunload', () => {
     window.removeEventListener('deviceorientation', handleDeviceOrientation);
   }
 });
+
+// ビデオ要素のサイズをデバイスに合わせて動的に調整する関数
+function adjustVideoSize() {
+    if (!videoTrack) return;
+  
+    const settings = videoTrack.getSettings();
+    const videoWidth = settings.width || 640;
+    const videoHeight = settings.height || 480;
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+  
+    console.log(`ビデオ設定: ${videoWidth}x${videoHeight}, 画面: ${screenWidth}x${screenHeight}`);
+  
+    // スクリーンとビデオのアスペクト比を比較
+    const screenAspect = screenWidth / screenHeight;
+    const videoAspect = videoWidth / videoHeight;
+  
+    if (videoAspect > screenAspect) {
+      // ビデオの方が横長の場合は、高さに合わせて横をクロップ
+      const scale = screenHeight / videoHeight;
+      const newWidth = videoWidth * scale;
+      const left = (screenWidth - newWidth) / 2;
+  
+      video.style.width = `${newWidth}px`;
+      video.style.height = `${screenHeight}px`;
+      video.style.left = `${left}px`;
+      video.style.top = '0px';
+    } else {
+      // ビデオの方が縦長の場合は、幅に合わせて縦をクロップ
+      const scale = screenWidth / videoWidth;
+      const newHeight = videoHeight * scale;
+      const top = (screenHeight - newHeight) / 2;
+  
+      video.style.width = `${screenWidth}px`;
+      video.style.height = `${newHeight}px`;
+      video.style.left = '0px';
+      video.style.top = `${top}px`;
+    }
+  
+    // A-Frameシーンのサイズも同様に調整
+    if (arContainer) {
+      arContainer.style.width = '100vw';
+      arContainer.style.height = '100vh';
+    }
+  
+    console.log(`ビデオサイズ調整完了: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
+  }
