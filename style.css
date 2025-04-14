@@ -1,276 +1,283 @@
 :root {
-  --primary-color: #2962ff;
-  --accent-color: #00c853;
-  --dark-color: #212121;
-  --light-color: #fafafa;
-  --transition: all 0.3s ease;
-}
-
-body, html {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  color: var(--light-color);
-  background-color: #000;
-  height: 100%;
-  width: 100%;
-  position: fixed; /* スクロールを完全に防止 */
-}
-
-#videoBackground {
-  position: fixed;
-  top: 0; 
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  object-fit: cover;
-  z-index: 1; /* ビデオを下層に */
-  display: none; /* 初期状態は非表示 */
-  background-color: #000;
-}
-
-/* ARコンテナの改善 */
-#arContainer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 2; /* ARをビデオの上に */
-  display: none; /* 初期状態は非表示 */
-}
-
-/* A-Frameコンテナのスタイル強化 */
-a-scene {
-  width: 100% !important;
-  height: 100% !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  z-index: 3 !important;
-  background: transparent !important;
-  pointer-events: auto !important; /* 相互作用を有効化 */
-}
-
-/* A-Frameキャンバス用のスタイル */
-canvas.a-canvas {
-  width: 100% !important;
-  height: 100% !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  z-index: 3 !important;
-}
-
-/* 3Dオブジェクトのスタイル強化 */
-#arObject {
-  pointer-events: auto !important;
-  visibility: visible !important;
-  display: block !important;
-}
-
-/* ボタンの共通スタイル */
-.btn {
-  border: none;
-  border-radius: 50px;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.btn:active {
-  transform: scale(0.95);
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.btn-success {
-  background-color: var(--accent-color);
-  color: white;
-}
-
-.btn-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* キューブボタン用のスタイル */
-#toggleCubeBtn.active {
-  background-color: var(--accent-color);
-}
-
-/* UI コンテナ */
-.ui-container {
-  position: fixed;
-  bottom: 32px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10;
-}
-
-/* スタートスクリーン */
-#startScreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(25,25,35,0.9) 0%, rgba(10,10,15,0.95) 100%);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
-}
-
-#startScreen h1 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-  color: white;
-  text-align: center;
-}
-
-#startScreen p {
-  font-size: 1.1rem;
-  max-width: 80%;
-  text-align: center;
-  margin-bottom: 2rem;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* 操作パネル */
-#controlPanel {
-  display: none;
-  background-color: rgba(33, 33, 33, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 28px;
-  padding: 8px;
-  z-index: 20;
-}
-
-.controls {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-/* モーション有効化ボタン */
-#enableMotionButton {
-  display: none;
-  margin-top: 16px;
-}
-
-/* ステータスメッセージ */
-#statusMessage {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 24px;
-  font-size: 14px;
-  max-width: 80%;
-  text-align: center;
-  z-index: 50;
-  display: none;
-  transition: opacity 0.3s ease;
-}
-
-/* ローディングインジケーター */
-#loadingIndicator {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 200;
-}
-
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 5px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: var(--primary-color);
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* カラーピッカー */
-#colorPanel {
-  display: none;
-  position: absolute;
-  bottom: 100px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(33, 33, 33, 0.8);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 16px;
-  z-index: 20;
-}
-
-.color-options {
-  display: flex;
-  gap: 8px;
-}
-
-.color-option {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.color-option:hover, .color-option.active {
-  transform: scale(1.1);
-  border-color: white;
-}
-
-/* ミラーリングをサポート */
-.mirror-mode {
-  transform: scaleX(-1);
-}
-
-/* Safari用のビデオ背景修正 */
-@supports (-webkit-touch-callout: none) {
+    --primary-color: #2962ff;
+    --accent-color: #00c853;
+    --dark-color: #212121;
+    --light-color: #fafafa;
+    --transition: all 0.3s ease;
+  }
+  
+  body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    color: var(--light-color);
+    background-color: #000;
+    height: 100%;
+    width: 100%;
+    position: fixed; /* スクロールを完全に防止 */
+  }
+  
   #videoBackground {
+    position: fixed;
+    top: 0; 
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 1; /* ビデオを下層に */
+    display: none; /* 初期状態は非表示 */
     background-color: #000;
   }
-}
+  
+  /* ARコンテナの改善 */
+  #arContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2; /* ARをビデオの上に */
+    display: none; /* 初期状態は非表示 */
+    overflow: hidden; /* はみ出し防止 */
+  }
+  /* A-Frameコンテナのスタイル強化 */
+  a-scene {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 3 !important;
+    background: transparent !important;
+    pointer-events: auto !important; /* 相互作用を有効化 */
+    display: block !important; /* 確実に表示 */
+  }
+  
+  /* A-Frameキャンバス用のスタイル */
+  canvas.a-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 3 !important;
+    display: block !important; /* 確実に表示 */
+  }
+  
+  /* 3Dオブジェクトのスタイル強化 */
+  #arObject {
+    pointer-events: auto !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+  
+  /* ボタンの共通スタイル */
+  .btn {
+    border: none;
+    border-radius: 50px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn:active {
+    transform: scale(0.95);
+  }
+  
+  .btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+  }
+  
+  .btn-success {
+    background-color: var(--accent-color);
+    color: white;
+  }
+  
+  .btn-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* キューブボタン用のスタイル */
+  #toggleCubeBtn.active {
+    background-color: var(--accent-color);
+  }
+  
+  /* UI コンテナ */
+  .ui-container {
+    position: fixed;
+    bottom: 32px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+  }
+  
+  /* スタートスクリーン */
+  #startScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(25,25,35,0.9) 0%, rgba(10,10,15,0.95) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  
+  #startScreen h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: white;
+    text-align: center;
+  }
+  
+  #startScreen p {
+    font-size: 1.1rem;
+    max-width: 80%;
+    text-align: center;
+    margin-bottom: 2rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+  
+  /* 操作パネル */
+  #controlPanel {
+    display: none;
+    background-color: rgba(33, 33, 33, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 28px;
+    padding: 8px;
+    z-index: 20;
+  }
+  
+  .controls {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  
+  /* モーション有効化ボタン */
+  #enableMotionButton {
+    display: none;
+    margin-top: 16px;
+  }
+  
+  /* ステータスメッセージ */
+  #statusMessage {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    max-width: 80%;
+    text-align: center;
+    z-index: 50;
+    display: none;
+    transition: opacity 0.3s ease;
+  }
+  
+  /* ローディングインジケーター */
+  #loadingIndicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+  }
+  
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  /* カラーピッカー */
+  #colorPanel {
+    display: none;
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(33, 33, 33, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px;
+    z-index: 20;
+  }
+  
+  .color-options {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .color-option {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  
+  .color-option:hover, .color-option.active {
+    transform: scale(1.1);
+    border-color: white;
+  }
+  
+  /* ミラーリングをサポート */
+  .mirror-mode {
+    transform: scaleX(-1);
+  }
+  
+  /* Safari用のビデオ背景修正 */
+  @supports (-webkit-touch-callout: none) {
+    #videoBackground {
+      background-color: #000;
+    }
+  }
+  
+  /* AR要素を確実に表示するためのバックアップスタイル */
+  .a-enter-vr, .a-enter-ar {
+    display: none !important;
+  }
 
-/* AR要素を確実に表示するためのバックアップスタイル */
-.a-enter-vr, .a-enter-ar {
-  display: none !important;
-}
+/* A-Frame要素を常に表示させるための追加設定 */
+  .a-canvas.a-grab-cursor:hover, a-scene canvas:hover {
+    cursor: grab !important;
+  }
