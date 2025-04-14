@@ -15,7 +15,6 @@ const switchCameraBtn = document.getElementById('switchCameraBtn');
 const arContainer = document.getElementById('arContainer');
 const toggleCubeBtn = document.getElementById('toggleCubeBtn');
 
-
 // カメラの状態を追跡
 let currentStream = null;
 let isFrontCamera = false;
@@ -34,20 +33,35 @@ function adjustSceneSize() {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
   
-    // a-sceneとcanvasのサイズを調整
     const scene = document.querySelector('a-scene');
+    const canvas = document.querySelector('canvas.a-canvas');
+  
     if (scene) {
       scene.style.width = `${screenWidth}px`;
       scene.style.height = `${screenHeight}px`;
     }
-  
-    const canvas = document.querySelector('canvas.a-canvas');
     if (canvas) {
       canvas.style.width = `${screenWidth}px`;
       canvas.style.height = `${screenHeight}px`;
     }
+  }
   
-    console.log("シーンとキャンバスのサイズを調整:", { screenWidth, screenHeight });
+  // --- initAR関数の簡略化とSafari対応統合 ---
+  function initAR() {
+    aframeScene = document.querySelector('a-scene');
+    if (!aframeScene) {
+      console.error("A-Frameシーンが見つかりません");
+      return;
+    }
+  
+    aframeScene.addEventListener('loaded', () => {
+      adjustSceneSize();
+      centerCube();
+    });
+  
+    adjustSceneForSafari(); // Safari対応のスタイル調整を統合
+    adjustSceneSize();
+    centerCube();
 }
 
 function centerCube() {
@@ -100,21 +114,48 @@ function isSafari() {
 }
   
 // 無限ループ解消：キューブの表示状態を確認
-let cubeVisibilityCheckInterval = null; // 確認用のインターバルID
+let cubeVisibilityCheckHandle = null;
 
 function startCubeVisibilityCheck() {
-  if (cubeVisibilityCheckInterval) return; // 二重起動を防止
+  if (cubeVisibilityCheckHandle) return; // 既に監視中の場合は何もしない
 
-  cubeVisibilityCheckInterval = setInterval(() => {
+  const checkVisibility = () => {
     if (isAppStarted && isCubeVisible) {
       const actualVisibility = arObject.getAttribute('visible');
       if (actualVisibility === false || actualVisibility === 'false') {
-        console.log("キューブが非表示になっているので再表示します");
-        ensureCubeVisible();
+        ensureCubeVisible(); // キューブが非表示なら再表示
       }
     }
-  }, 1000); // 1秒ごとに確認
+    cubeVisibilityCheckHandle = requestAnimationFrame(checkVisibility);
+  };
+  cubeVisibilityCheckHandle = requestAnimationFrame(checkVisibility);
 }
+
+function stopCubeVisibilityCheck() {
+  if (cubeVisibilityCheckHandle) {
+    cancelAnimationFrame(cubeVisibilityCheckHandle);
+    cubeVisibilityCheckHandle = null; // ハンドルをクリア
+  }
+}
+
+// --- Safari対応のためのスタイル調整 ---
+function isSafari() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+function adjustSceneForSafari() {
+  if (isSafari()) {
+    const canvas = document.querySelector('canvas.a-canvas');
+    if (canvas) {
+      canvas.style.position = 'absolute';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+    }
+  }
+}
+
 
 function stopCubeVisibilityCheck() {
   if (cubeVisibilityCheckInterval) {
@@ -125,44 +166,40 @@ function stopCubeVisibilityCheck() {
 
 // アプリ起動時にキューブ表示チェックを開始
 async function startApp() {
-  if (isAppStarted) return;
-
-  showLoading(true);
-
-  try {
-    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
-    currentStream = stream;
-    isFrontCamera = newIsFrontCamera;
-    video.srcObject = stream;
-    video.classList.toggle('mirror-mode', isFrontCamera);
-
-    video.onloadedmetadata = () => {
-      video.play().then(() => {
-        video.style.display = 'block';
-        adjustVideoSize();
-      });
-    };
-
-    initAframeScene();
-
-    arContainer.style.display = 'block';
-    startScreen.style.display = 'none';
-    controlPanel.style.display = 'block';
-    isAppStarted = true;
-
-    showMessage("アプリを開始しました");
-    showLoading(false);
-
-    startCubeVisibilityCheck(); // キューブ表示監視を開始
-  } catch (err) {
-    console.error("アプリ起動エラー:", err);
-    showMessage("アプリの起動に失敗しました");
-    showLoading(false);
-  }
+    if (isAppStarted) return;
+  
+    try {
+      // カメラの許可をリクエストし、ストリームを取得
+      const { stream } = await requestCameraPermission(false);
+      video.srcObject = stream;
+  
+      video.onloadedmetadata = () => {
+        video.play();
+      };
+  
+      initAR();
+      arContainer.style.display = 'block';
+      isAppStarted = true;
+  
+      startCubeVisibilityCheck(); // キューブの状態監視を開始
+    } catch (err) {
+      console.error("アプリ起動エラー:", err);
+    }
 }
 
+// --- アプリ終了時のリソース解放処理を追加 ---
+function stopApp() {
+    stopCubeVisibilityCheck();
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+    isAppStarted = false;
+}
   
-  function stopCubeVisibilityCheck() {
+window.addEventListener('beforeunload', stopApp); // ページ終了時にリソース解放
+  
+function stopCubeVisibilityCheck() {
     if (cubeVisibilityCheckInterval) {
       clearInterval(cubeVisibilityCheckInterval);
       cubeVisibilityCheckInterval = null;
@@ -213,7 +250,7 @@ async function startApp() {
     }
 }
 
-  // スタートボタンのイベントリスナーを設定
+// スタートボタンのイベントリスナーを設定
 startButton.addEventListener('click', startApp);
 
 // --- サイズ変更時のリアルタイム調整 ---
@@ -393,7 +430,7 @@ function adjustVideoSize() {
     }
     
     console.log(`ビデオサイズ調整: ${video.style.width} x ${video.style.height}, 位置: ${video.style.left}, ${video.style.top}`);
-  }
+}
 
 // メッセージを表示する関数
 function showMessage(text, duration = 3000) {
