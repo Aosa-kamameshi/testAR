@@ -24,12 +24,13 @@
   <div id="arContainer">
     <a-scene 
       embedded
-      alpha="true" 
-      device-orientation-permission-ui="enabled: false"
-      renderer="antialias: true; alpha: true; colorManagement: true;"
-      vr-mode-ui="enabled: false">
-      <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-      <a-box id="arObject" position="0 1 -3" material="color: #2196F3;" visible="false"></a-box>
+      vr-mode-ui="enabled: false"
+      renderer="antialias: true; alpha: true; colorManagement: true; physicallyCorrectLights: true;"
+      transparent="true">
+      <a-entity camera position="0 1.6 0" look-controls="enabled: false"></a-entity>
+      <a-box id="arObject" position="0 1 -3" rotation="0 45 0" scale="0.5 0.5 0.5" material="color: #2196F3; metalness: 0.2; roughness: 0.8;" shadow visible="false"></a-box>
+      <a-light type="ambient" color="#FFF" intensity="0.5"></a-light>
+      <a-light type="directional" color="#FFF" intensity="1" position="1 1 1"></a-light>
     </a-scene>
   </div>
   
