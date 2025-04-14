@@ -20,6 +20,8 @@ let currentStream = null;
 let isFrontCamera = false;
 let hasMultipleCameras = false;
 let isCubeVisible = false;
+let motionSensorEnabled = false;
+let isAppStarted = false;
 
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
@@ -185,21 +187,32 @@ function toggleCube() {
 
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
 function handleDeviceOrientation(event) {
-  if (!event || !isCubeVisible) return;
+  if (!event || !isCubeVisible || !motionSensorEnabled) return;
   
   // デバイスの向きに基づいて3Dオブジェクトの位置を調整
   const tiltLR = event.gamma; // 左右の傾き (-90〜90)
   const tiltFB = event.beta;  // 前後の傾き (-180〜180)
   
+  if (tiltLR === null || tiltFB === null) return;
+  
   // 箱の位置を更新（制限付き）
   const x = Math.max(-3, Math.min(3, tiltLR / 30));
   const y = Math.max(0, Math.min(3, 1 + tiltFB / 30));
   arObject.setAttribute('position', {x: x, y: y, z: -3});
+  
+  // キューブを少し回転させてアニメーション効果を加える
+  const currentRotation = arObject.getAttribute('rotation');
+  arObject.setAttribute('rotation', {
+    x: currentRotation.x,
+    y: (currentRotation.y + 0.5) % 360,
+    z: currentRotation.z
+  });
 }
 
 // 3Dオブジェクトの位置をリセットする関数
 function resetObjectPosition() {
   arObject.setAttribute('position', {x: 0, y: 1, z: -3});
+  arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
   showMessage("位置をリセットしました");
 }
 
@@ -211,8 +224,14 @@ async function enableMotionSensor() {
   if (motionGranted) {
     // モーションセンサーのイベントリスナーを追加
     window.addEventListener('deviceorientation', handleDeviceOrientation);
+    motionSensorEnabled = true;
     showMessage('モーションセンサーが有効になりました');
     enableMotionButton.style.display = 'none';
+    
+    // キューブが表示されていなければ自動的に表示する
+    if (!isCubeVisible) {
+      toggleCube();
+    }
   } else {
     showMessage('モーションセンサーを有効にできませんでした');
   }
@@ -222,6 +241,8 @@ async function enableMotionSensor() {
 
 // アプリを開始する関数
 async function startApp() {
+  if (isAppStarted) return;
+  
   showLoading(true);
   
   try {
@@ -266,7 +287,8 @@ async function startApp() {
     startScreen.style.display = 'none';
     controlPanel.style.display = 'block';
     
-    // キューブは最初は非表示のままにする
+    // アプリが開始されたことをマーク
+    isAppStarted = true;
     
     // モーションセンサーボタンの表示条件
     if (isMotionSupported) {
@@ -275,11 +297,15 @@ async function startApp() {
         enableMotionButton.style.display = 'block';
       } else {
         // 許可が不要なブラウザでは自動的にモーションセンサーを有効化
+        motionSensorEnabled = true;
         window.addEventListener('deviceorientation', handleDeviceOrientation);
       }
     }
     
     showLoading(false);
+    
+    // アプリ開始時に自動的にキューブを表示（オプション）
+    // setTimeout(() => toggleCube(), 1000);
     
   } catch (err) {
     console.error("アプリ起動エラー:", err);
@@ -310,6 +336,11 @@ function changeObjectColor(color) {
       option.classList.remove('active');
     }
   });
+  
+  // キューブが表示されていなければ表示する
+  if (!isCubeVisible) {
+    toggleCube();
+  }
 }
 
 // イベントリスナーの設定
@@ -347,11 +378,29 @@ window.addEventListener('resize', () => {
   }
 });
 
-// 最初のカラーオプションをアクティブに
-colorOptions[0].classList.add('active');
-
-// SafariでのARコンテナの初期表示を修正
+// A-Frame のロードが完了したことを確認
 document.addEventListener('DOMContentLoaded', () => {
   // ARコンテナの表示を一旦非表示にする
   arContainer.style.display = 'none';
+  
+  // A-Frame のシーンが読み込まれたら追加の初期化
+  const scene = document.querySelector('a-scene');
+  if (scene.hasLoaded) {
+    console.log('A-Frameシーンがすでに読み込まれています');
+  } else {
+    scene.addEventListener('loaded', function () {
+      console.log('A-Frameシーンが読み込まれました');
+    });
+  }
+  
+  // 最初のカラーオプションをアクティブに
+  colorOptions[0].classList.add('active');
+});
+
+// シングルタップでもARオブジェクトを表示するための追加リスナー
+document.addEventListener('click', () => {
+  if (isAppStarted && !isCubeVisible) {
+    // アプリが起動済みで、キューブが非表示の場合にタップで表示
+    // toggleCube();
+  }
 });
