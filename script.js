@@ -78,6 +78,56 @@ function initAR() {
     adjustSceneSize();
     centerCube();
 }
+
+// Safari対応のチェック関数
+function isSafari() {
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  }
+  
+  // A-Frameシーンのサイズ調整（Safari対応）
+  function adjustSceneForSafari() {
+    if (isSafari()) {
+      console.log("Safari環境のため、A-Frameシーンを調整します");
+      const aframeCanvas = document.querySelector('canvas.a-canvas');
+      if (aframeCanvas) {
+        aframeCanvas.style.position = 'absolute';
+        aframeCanvas.style.top = '0';
+        aframeCanvas.style.left = '0';
+        aframeCanvas.style.width = '100%';
+        aframeCanvas.style.height = '100%';
+      }
+    }
+  }
+  
+  // 無限ループ解消：キューブの表示状態を確認
+  let cubeVisibilityCheckInterval = null; // 確認用のインターバルID
+  function startCubeVisibilityCheck() {
+    if (cubeVisibilityCheckInterval) return; // 二重起動を防止
+  
+    cubeVisibilityCheckInterval = setInterval(() => {
+      if (isAppStarted && isCubeVisible) {
+        const actualVisibility = arObject.getAttribute('visible');
+        if (actualVisibility === false || actualVisibility === 'false') {
+          console.log("キューブが非表示になっているので再表示します");
+          ensureCubeVisible();
+        }
+      }
+    }, 1000); // 1秒ごとに確認
+  }
+  
+  function stopCubeVisibilityCheck() {
+    if (cubeVisibilityCheckInterval) {
+      clearInterval(cubeVisibilityCheckInterval);
+      cubeVisibilityCheckInterval = null;
+    }
+  }
+  
+  // Safari対応とキューブ表示監視の初期化を統合
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMがロードされました - 追加部分の初期化");
+    adjustSceneForSafari();
+    startCubeVisibilityCheck();
+});
   
 // モーションセンサーの許可をリクエストする関数
 // スタートボタンイベントの改善
@@ -468,25 +518,27 @@ async function enableMotionSensor() {
 
 // A-Frameシーンの初期化
 function initAframeScene() {
-  aframeScene = document.querySelector('a-scene');
-  if (!aframeScene) {
-    console.error("A-Frameシーンが見つかりません");
-    return;
-  }
+    aframeScene = document.querySelector('a-scene');
+    if (!aframeScene) {
+      console.error("A-Frameシーンが見つかりません");
+      return;
+    }
   
-  // A-Frameシーンの設定
-  const camera = aframeScene.querySelector('[camera]');
-  if (camera) {
-    // カメラのlook-controlsを無効に設定
-    camera.setAttribute('look-controls', 'enabled', false);
-  }
+    // A-Frameシーンの設定
+    const camera = aframeScene.querySelector('[camera]');
+    if (camera) {
+      camera.setAttribute('look-controls', 'enabled', false);
+    }
   
-  // ARコンテナのサイズをウィンドウサイズに合わせる
-  arContainer.style.width = '100vw';
-  arContainer.style.height = '100vh';
+    // ARコンテナのサイズをウィンドウサイズに合わせる
+    arContainer.style.width = '100vw';
+    arContainer.style.height = '100vh';
   
-  // キューブの初期設定
-  ensureCubeVisible();
+    // Safari対応のサイズ調整
+    adjustSceneForSafari();
+  
+    // キューブの初期設定
+    ensureCubeVisible();
 }
 
 // アプリを開始する関数
@@ -593,33 +645,12 @@ async function startApp() {
     setTimeout(() => resetObjectPosition(), 500);
     
     // アニメーションフレームを開始（キューブ表示確認用）
-    requestAnimationFrame(checkCubeVisibility);
+    requestAnimationFrame(startCubeVisibilityCheck);
     
   } catch (err) {
     console.error("アプリ起動エラー:", err);
     showLoading(false);
     showMessage("アプリの起動に失敗しました: " + err.message);
-  }
-}
-
-// キューブの表示状態を定期的に確認する関数
-let visibilityCheckScheduled = false;
-
-function checkCubeVisibility() {
-  if (isAppStarted && isCubeVisible) {
-    const actualVisibility = arObject.getAttribute('visible');
-    if (actualVisibility === false || actualVisibility === 'false') {
-      console.log("キューブが非表示になっているので再表示します");
-      ensureCubeVisible();
-    }
-  }
-
-  if (!visibilityCheckScheduled) {
-    visibilityCheckScheduled = true;
-    setTimeout(() => {
-      requestAnimationFrame(checkCubeVisibility);
-      visibilityCheckScheduled = false;
-    }, 1000);
   }
 }
 
