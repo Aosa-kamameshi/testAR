@@ -283,32 +283,32 @@ function showLoading(show) {
 
 // カメラを切り替える関数
 async function switchCamera() {
-  try {
-    showLoading(true);
-    const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
-    
-    // ビデオ要素に新しいストリームを設定
-    video.srcObject = stream;
-    currentStream = stream;
-    isFrontCamera = newIsFrontCamera;
-    
-    // 前面カメラの場合はミラーリングを適用
-    video.classList.toggle('mirror-mode', isFrontCamera);
-    
-    // カメラのサイズを調整
-    videoTrack = stream.getVideoTracks()[0];
-    adjustVideoSize();
-    
-    showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
-    showLoading(false);
-    
-    // カメラ切り替え後にキューブの位置をリセット
-    resetObjectPosition();
-  } catch (err) {
-    console.error("カメラ切り替えエラー:", err);
-    showMessage("カメラの切り替えに失敗しました");
-    showLoading(false);
-  }
+    try {
+      showLoading(true);
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(!isFrontCamera);
+      
+      // ビデオ要素に新しいストリームを設定
+      video.srcObject = stream;
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+      
+      // 前面カメラの場合はミラーリングを適用
+      video.classList.toggle('mirror-mode', isFrontCamera);
+      
+      // カメラのサイズを調整
+      videoTrack = stream.getVideoTracks()[0];
+      adjustVideoSize();
+      
+      showMessage(`${isFrontCamera ? '前面' : '背面'}カメラに切り替えました`);
+      showLoading(false);
+      
+      // カメラ切り替え後にシーンサイズとキューブ位置を調整
+      adjustSceneSizeAndPosition();
+    } catch (err) {
+      console.error("カメラ切り替えエラー:", err);
+      showMessage("カメラの切り替えに失敗しました");
+      showLoading(false);
+    }
 }
 
 // キューブの表示/非表示を切り替える関数
@@ -369,9 +369,8 @@ function ensureCubeVisible() {
 
 // 画面の中央座標を取得する関数
 function getScreenCenter() {
-  // 画面サイズに基づく調整（視覚的な中央に配置するため）
-  // 深さは-3のままで、画面中央に表示されるようにする
-  return { x: 0, y: 1, z: -3 };
+    // 画面サイズに基づく調整（視覚的な中央に配置するため）
+    return { x: 0, y: 1, z: -3 };
 }
 
 // デバイスの向きに応じて3Dオブジェクトを更新する関数
@@ -400,15 +399,17 @@ function handleDeviceOrientation(event) {
 
 // 3Dオブジェクトの位置をリセットする関数（画面中央に配置）
 function resetObjectPosition() {
-  const centerPosition = getScreenCenter();
-  arObject.setAttribute('position', centerPosition);
-  arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
-  arObject.setAttribute('scale', '0.5 0.5 0.5');
-  showMessage("キューブを画面中央に配置しました");
+    // 画面の中央座標を取得
+    const centerPosition = getScreenCenter();
+    arObject.setAttribute('position', centerPosition);
+    arObject.setAttribute('rotation', {x: 0, y: 45, z: 0});
+    arObject.setAttribute('scale', '0.5 0.5 0.5');
+    showMessage("キューブを画面中央に配置しました");
+    
+    // キューブが表示されていることを確認
+    ensureCubeVisible();
+  }
   
-  // キューブが表示されていることを確認
-  ensureCubeVisible();
-}
 
 // モーションセンサーを有効化する関数
 async function enableMotionSensor() {
@@ -446,26 +447,25 @@ async function enableMotionSensor() {
 
 // A-Frameシーンの初期化
 function initAframeScene() {
-  aframeScene = document.querySelector('a-scene');
-  if (!aframeScene) {
-    console.error("A-Frameシーンが見つかりません");
-    return;
+    aframeScene = document.querySelector('a-scene');
+    if (!aframeScene) {
+      console.error("A-Frameシーンが見つかりません");
+      return;
+    }
+    
+    // A-Frameシーンの設定
+    const camera = aframeScene.querySelector('[camera]');
+    if (camera) {
+      // カメラのlook-controlsを無効に設定
+      camera.setAttribute('look-controls', 'enabled', false);
+    }
+    
+    // ARコンテナと3Dシーンのサイズを画面サイズに合わせる
+    adjustSceneSizeAndPosition();
+    
+    // キューブの初期設定
+    ensureCubeVisible();
   }
-  
-  // A-Frameシーンの設定
-  const camera = aframeScene.querySelector('[camera]');
-  if (camera) {
-    // カメラのlook-controlsを無効に設定
-    camera.setAttribute('look-controls', 'enabled', false);
-  }
-  
-  // ARコンテナのサイズをウィンドウサイズに合わせる
-  arContainer.style.width = '100vw';
-  arContainer.style.height = '100vh';
-  
-  // キューブの初期設定
-  ensureCubeVisible();
-}
 
 // --- アプリ起動時の関数 ---
 async function startApp() {
@@ -496,6 +496,9 @@ async function startApp() {
   
       initAframeScene();
       arContainer.style.display = 'block';
+      
+      // ここで明示的にシーンのサイズと位置を調整
+      adjustSceneSizeAndPosition();
   
       if (isFrontCamera) {
         showMessage('前面カメラを使用しています');
@@ -525,8 +528,6 @@ async function startApp() {
       }
   
       showLoading(false);
-  
-      // --- 修正済み関数を呼び出し ---
       checkCubeVisibility();
   
     } catch (err) {
@@ -597,49 +598,55 @@ colorOptions.forEach(option => {
 
 // ウィンドウのリサイズ時にビデオとARの調整
 window.addEventListener('resize', () => {
-  // アプリが開始されている場合のみ調整
-  if (isAppStarted && videoTrack) {
-    // ビデオサイズを画面サイズに合わせる
-    setTimeout(() => {
-      adjustVideoSize();
-      
-      // 画面サイズが変わったらキューブの位置をリセット
-      resetObjectPosition();
-    }, 300);
-  }
+    // アプリが開始されている場合のみ調整
+    if (isAppStarted && videoTrack) {
+      // ビデオサイズを画面サイズに合わせる
+      setTimeout(() => {
+        adjustVideoSize();
+        // シーンサイズとキューブ位置を調整
+        adjustSceneSizeAndPosition();
+      }, 300);
+    }
 });
+  
 
 // デバイスの向き変更イベント
 window.addEventListener('orientationchange', () => {
-  if (isAppStarted && videoTrack) {
-    setTimeout(() => {
-      adjustVideoSize();
-      resetObjectPosition();
-    }, 500); // 向き変更後に少し待って調整
-  }
+    if (isAppStarted && videoTrack) {
+      setTimeout(() => {
+        adjustVideoSize();
+        // シーンサイズとキューブ位置を調整
+        adjustSceneSizeAndPosition();
+      }, 500); // 向き変更後に少し待って調整
+    }
 });
+  
 
 // A-Frame のロードが完了したことを確認
 document.addEventListener('DOMContentLoaded', () => {
-  // ARコンテナの表示を一旦非表示にする
-  arContainer.style.display = 'none';
-  
-  // A-Frame のシーンが読み込まれたらシーン参照を保存
-  const scene = document.querySelector('a-scene');
-  aframeScene = scene;
-  
-  if (scene.hasLoaded) {
-    console.log('A-Frameシーンがすでに読み込まれています');
-    initAframeScene();
-  } else {
-    scene.addEventListener('loaded', function () {
-      console.log('A-Frameシーンが読み込まれました');
+    // ARコンテナの表示を一旦非表示にする
+    arContainer.style.display = 'none';
+    
+    // A-Frame のシーンが読み込まれたらシーン参照を保存
+    const scene = document.querySelector('a-scene');
+    aframeScene = scene;
+    
+    if (scene.hasLoaded) {
+      console.log('A-Frameシーンがすでに読み込まれています');
       initAframeScene();
-    });
-  }
-  
-  // 最初のカラーオプションをアクティブに
-  colorOptions[0].classList.add('active');
+      // 明示的にシーンサイズとキューブ位置を調整
+      adjustSceneSizeAndPosition();
+    } else {
+      scene.addEventListener('loaded', function () {
+        console.log('A-Frameシーンが読み込まれました');
+        initAframeScene();
+        // 明示的にシーンサイズとキューブ位置を調整
+        adjustSceneSizeAndPosition();
+      });
+    }
+    
+    // 最初のカラーオプションをアクティブに
+    colorOptions[0].classList.add('active');
 });
 
 // アプリケーションの終了時にリソースを解放
@@ -666,10 +673,16 @@ function adjustSceneSizeAndPosition() {
       scene.style.height = `${screenHeight}px`;
     }
   
+    // ARコンテナのサイズも合わせて調整
+    if (arContainer) {
+      arContainer.style.width = `${screenWidth}px`;
+      arContainer.style.height = `${screenHeight}px`;
+    }
+  
     // キューブの位置を画面の中央に設定
     const cube = document.getElementById('arObject');
     if (cube) {
-      const centerX = 0; // 中心 X 座標 (A-Frame は -3 ~ 3 の範囲)
+      const centerX = 0; // 中心 X 座標 (A-Frame は中心が0)
       const centerY = 1; // 中心 Y 座標 (1 は高さの目安)
       const centerZ = -3; // 中心 Z 座標 (カメラからの距離)
   
@@ -678,10 +691,11 @@ function adjustSceneSizeAndPosition() {
     }
   }
   
+  
   // --- ウィンドウサイズ変更時に再調整 ---
   window.addEventListener('resize', adjustSceneSizeAndPosition);
   
   // --- アプリ起動時にシーンサイズとキューブ位置を調整 ---
   document.addEventListener('DOMContentLoaded', () => {
     adjustSceneSizeAndPosition();
-  });
+});
