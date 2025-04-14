@@ -32,7 +32,6 @@ let aframeScene = null;
 
 // モーションセンサーの許可をリクエストする関数
 // スタートボタンイベントの改善
-// スタートボタンイベントの改善
 async function startApp() {
     if (isAppStarted) return;
   
@@ -51,6 +50,12 @@ async function startApp() {
   
       // 前面カメラの場合はミラーリングを適用
       video.classList.toggle('mirror-mode', isFrontCamera);
+  
+      // モーションセンサーの許可をリクエスト
+      const motionGranted = await requestMotionPermission();
+      if (!motionGranted) {
+        showMessage("モーションセンサーが許可されませんでした");
+      }
   
       // ビデオの再生確認
       await new Promise((resolve) => {
@@ -90,18 +95,6 @@ async function startApp() {
       icon.classList.remove('fa-cube');
       icon.classList.add('fa-eye-slash');
   
-      // モーションセンサーの準備
-      if (isMotionSupported) {
-        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-          enableMotionButton.style.display = 'block';
-        } else {
-          enableMotionSensor(); // 自動的にモーションセンサーを有効化
-        }
-      } else {
-        enableMotionButton.style.display = 'none';
-        showMessage("このデバイスではモーションセンサーがサポートされていません");
-      }
-  
       // 初期位置にキューブを配置
       resetObjectPosition();
   
@@ -112,6 +105,9 @@ async function startApp() {
       showLoading(false);
     }
   }
+  
+  // スタートボタンのイベントリスナーを設定
+  startButton.addEventListener('click', startApp);
   
   // スタートボタンのイベントリスナーを設定
   startButton.addEventListener('click', startApp);
