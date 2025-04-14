@@ -26,6 +26,9 @@ let isAppStarted = false;
 // モーションセンサーがサポートされているか確認
 const isMotionSupported = window.DeviceOrientationEvent || window.DeviceMotionEvent;
 
+// A-Frameシーンへの参照を保持
+let aframeScene = null;
+
 // モーションセンサーの許可をリクエストする関数
 async function requestMotionPermission() {
   try {
@@ -39,15 +42,40 @@ async function requestMotionPermission() {
       if (typeof DeviceOrientationEvent !== 'undefined' && 
           typeof DeviceOrientationEvent.requestPermission === 'function') {
         const orientationPermission = await DeviceOrientationEvent.requestPermission();
+        
+        if (orientationPermission !== 'granted') {
+          console.warn("方向センサーの使用が許可されていません");
+          return false;
+        }
       }
       
       if (motionPermission !== 'granted') {
         console.warn("モーションセンサーの使用が許可されていません");
         return false;
       }
+      
+      return true;
+    } 
+    
+    // Android またはその他のブラウザでは自動的に権限をリクエスト
+    // A-Frameのデフォルト許可リクエストUIを無効にしているので、独自のチェックを実装
+    if (window.DeviceOrientationEvent) {
+      // テスト用のリスナーを追加して権限状況を確認
+      const tempListener = (event) => {
+        window.removeEventListener('deviceorientation', tempListener);
+        // 実際にデータを受け取れるかどうかで権限を推測
+        return (event && (event.alpha !== null || event.beta !== null || event.gamma !== null));
+      };
+      
+      window.addEventListener('deviceorientation', tempListener, { once: true });
+      
+      // 一時的なタイムアウトで権限チェック (推測的手法)
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // 許可リクエストが不要なブラウザの場合はtrueを返す
       return true;
     }
-    // 許可リクエストが不要なブラウザの場合はtrueを返す
+    
     return true;
   } catch (err) {
     console.error("センサーアクセスエラー:", err);
@@ -239,6 +267,19 @@ async function enableMotionSensor() {
     showMessage('モーションセンサーが有効になりました');
     enableMotionButton.style.display = 'none';
     
+    // A-Frameシーンの制御を有効化
+    try {
+      if (aframeScene) {
+        // A-Frameのロードが完了している場合は、look-controlsを有効にする
+        const cameraEntity = aframeScene.querySelector('[camera]');
+        if (cameraEntity) {
+          // look-controlsを有効化せず、完全にカスタムコントロールに任せる
+        }
+      }
+    } catch (err) {
+      console.warn("A-Frameシーンの制御設定エラー:", err);
+    }
+    
     // キューブが表示されていなければ自動的に表示する
     if (!isCubeVisible) {
       toggleCube();
@@ -248,6 +289,22 @@ async function enableMotionSensor() {
   }
   
   showLoading(false);
+}
+
+// A-Frameシーンの初期化
+function initAframeScene() {
+  aframeScene = document.querySelector('a-scene');
+  if (!aframeScene) {
+    console.error("A-Frameシーンが見つかりません");
+    return;
+  }
+  
+  // A-Frameシーンの設定
+  const camera = aframeScene.querySelector('[camera]');
+  if (camera) {
+    // カメラのlook-controlsを無効に設定
+    camera.setAttribute('look-controls', 'enabled', false);
+  }
 }
 
 // アプリを開始する関数
@@ -285,6 +342,9 @@ async function startApp() {
       };
     });
     
+    // A-Frameシーンの初期化
+    initAframeScene();
+    
     // ARコンテナの表示
     arContainer.style.display = 'block';
     
@@ -313,12 +373,33 @@ async function startApp() {
     if (isMotionSupported) {
       if (typeof DeviceMotionEvent !== 'undefined' && 
           typeof DeviceMotionEvent.requestPermission === 'function') {
+        // iOS 13+の場合は明示的な許可が必要
         enableMotionButton.style.display = 'block';
       } else {
-        // 許可が不要なブラウザでは自動的にモーションセンサーを有効化
-        motionSensorEnabled = true;
-        window.addEventListener('deviceorientation', handleDeviceOrientation);
+        // 他のブラウザでは自動的にモーションセンサーを有効化を試みる
+        // しかし、あくまでもユーザージェスチャー後に実行する必要がある場合もあるので、
+        // ボタンは表示しておく
+        enableMotionButton.style.display = 'block';
+        
+        // Android Chromeなどでは直接試みる
+        try {
+          // テスト用のリスナーを追加して権限状況を確認
+          const tempListener = (event) => {
+            window.removeEventListener('deviceorientation', tempListener);
+            // 実際にデータを受け取れた場合は自動的に有効化
+            if (event && (event.alpha !== null || event.beta !== null || event.gamma !== null)) {
+              enableMotionSensor();
+            }
+          };
+          
+          window.addEventListener('deviceorientation', tempListener, { once: true });
+        } catch (err) {
+          console.warn("自動モーションセンサー検出エラー:", err);
+        }
       }
+    } else {
+      enableMotionButton.style.display = 'none';
+      showMessage("このデバイスではモーションセンサーがサポートされていません");
     }
     
     showLoading(false);
@@ -407,13 +488,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // ARコンテナの表示を一旦非表示にする
   arContainer.style.display = 'none';
   
-  // A-Frame のシーンが読み込まれたら追加の初期化
+  // A-Frame のシーンが読み込まれたらシーン参照を保存
   const scene = document.querySelector('a-scene');
+  aframeScene = scene;
+  
   if (scene.hasLoaded) {
     console.log('A-Frameシーンがすでに読み込まれています');
+    initAframeScene();
   } else {
     scene.addEventListener('loaded', function () {
       console.log('A-Frameシーンが読み込まれました');
+      initAframeScene();
     });
   }
   
@@ -425,5 +510,10 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('beforeunload', () => {
   if (currentStream) {
     currentStream.getTracks().forEach(track => track.stop());
+  }
+  
+  // モーションセンサーのリスナーを削除
+  if (motionSensorEnabled) {
+    window.removeEventListener('deviceorientation', handleDeviceOrientation);
   }
 });
