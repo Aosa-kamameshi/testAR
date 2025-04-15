@@ -44,26 +44,43 @@ function adjustSceneSize() {
       canvas.style.width = `${screenWidth}px`;
       canvas.style.height = `${screenHeight}px`;
     }
-  }
+}
   
-  // --- initAR関数の簡略化とSafari対応統合 ---
-  function initAR() {
+function initAR() {
     aframeScene = document.querySelector('a-scene');
     if (!aframeScene) {
       console.error("A-Frameシーンが見つかりません");
       return;
     }
-  
+    
+    // モバイル環境の検出と最適化
+    optimizeForMobile();
+    
+    // Safariの場合は特別な修正を適用
+    fixSafariARDisplay();
+    
+    // シーンがロードされたらサイズ調整とキューブの配置
     aframeScene.addEventListener('loaded', () => {
+      console.log("A-Frameシーンがロードされました");
       adjustSceneSize();
       centerCube();
+      ensureCubeVisible(); // キューブの表示を確実にする
+      
+      // Safari特有の問題修正を遅延実行
+      if (isSafari()) {
+        setTimeout(forceShowCube, 500);
+      }
     });
-  
-    adjustSceneForSafari(); // Safari対応のスタイル調整を統合
-    adjustSceneSize();
-    centerCube();
+    
+    // すでにロード済みの場合も処理を実行
+    if (aframeScene.hasLoaded) {
+      console.log("A-Frameシーンは既にロード済み");
+      adjustSceneSize();
+      centerCube();
+      ensureCubeVisible();
+    }
 }
-
+  
 function centerCube() {
     const cube = document.getElementById('arObject');
     if (cube) {
@@ -92,26 +109,6 @@ function initAR() {
     adjustSceneSize();
     centerCube();
 }
-
-// Safari対応のチェック関数
-function isSafari() {
-    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  }
-  
-  // A-Frameシーンのサイズ調整（Safari対応）
-  function adjustSceneForSafari() {
-    if (isSafari()) {
-      console.log("Safari環境のため、A-Frameシーンを調整します");
-      const aframeCanvas = document.querySelector('canvas.a-canvas');
-      if (aframeCanvas) {
-        aframeCanvas.style.position = 'absolute';
-        aframeCanvas.style.top = '0';
-        aframeCanvas.style.left = '0';
-        aframeCanvas.style.width = '100%';
-        aframeCanvas.style.height = '100%';
-      }
-    }
-}
   
 // 無限ループ解消：キューブの表示状態を確認
 let cubeVisibilityCheckHandle = null;
@@ -131,18 +128,6 @@ function startCubeVisibilityCheck() {
   cubeVisibilityCheckHandle = requestAnimationFrame(checkVisibility);
 }
 
-function stopCubeVisibilityCheck() {
-  if (cubeVisibilityCheckHandle) {
-    cancelAnimationFrame(cubeVisibilityCheckHandle);
-    cubeVisibilityCheckHandle = null; // ハンドルをクリア
-  }
-}
-
-// --- Safari対応のためのスタイル調整 ---
-function isSafari() {
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}
-
 function adjustSceneForSafari() {
   if (isSafari()) {
     const canvas = document.querySelector('canvas.a-canvas');
@@ -156,34 +141,74 @@ function adjustSceneForSafari() {
   }
 }
 
-
-function stopCubeVisibilityCheck() {
-  if (cubeVisibilityCheckInterval) {
-    clearInterval(cubeVisibilityCheckInterval);
-    cubeVisibilityCheckInterval = null;
-  }
-}
-
 // アプリ起動時にキューブ表示チェックを開始
 async function startApp() {
     if (isAppStarted) return;
-  
+    
+    showLoading(true);
+    
     try {
-      // カメラの許可をリクエストし、ストリームを取得
-      const { stream } = await requestCameraPermission(false);
+      // カメラアクセスを取得
+      const { stream, isFrontCamera: newIsFrontCamera } = await requestCameraPermission(false);
+      currentStream = stream;
+      isFrontCamera = newIsFrontCamera;
+      
+      // ビデオ要素の設定
       video.srcObject = stream;
-  
-      video.onloadedmetadata = () => {
-        video.play();
-      };
-  
+      video.classList.toggle('mirror-mode', isFrontCamera);
+      
+      // ビデオのメタデータがロードされたらサイズ調整と再生
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play()
+            .then(() => {
+              video.style.display = 'block';
+              adjustVideoSize();
+              resolve();
+            })
+            .catch(err => {
+              console.warn("ビデオ再生の自動開始に失敗しました:", err);
+              // Safariではユーザーインタラクションが必要な場合がある
+              video.style.display = 'block';
+              resolve();
+            });
+        };
+        
+        // 念のためタイムアウト設定
+        setTimeout(resolve, 3000);
+      });
+      
+      // A-Frameの初期化とARコンテナ表示
       initAR();
       arContainer.style.display = 'block';
+      
+      // UI表示の更新
+      startScreen.style.display = 'none';
+      controlPanel.style.display = 'block';
       isAppStarted = true;
-  
-      startCubeVisibilityCheck(); // キューブの状態監視を開始
+      
+      // キューブを確実に表示
+      setTimeout(() => {
+        ensureCubeVisible();
+        forceShowCube(); // 強制表示を追加
+      }, 300);
+      
+      showMessage("アプリを開始しました");
+      showLoading(false);
+      
+      // Safari特有の問題に対する追加修正
+      if (isSafari()) {
+        setTimeout(fixSafariARDisplay, 500);
+        setTimeout(forceShowCube, 1000);
+      }
+      
+      // 表示監視の開始
+      startCubeVisibilityCheck();
+      
     } catch (err) {
       console.error("アプリ起動エラー:", err);
+      showMessage("アプリの起動に失敗しました: " + err.message);
+      showLoading(false);
     }
 }
 
@@ -499,30 +524,46 @@ function toggleCube() {
 }
 
 // キューブを確実に表示する関数
-// ensureCubeVisible 関数の改善
 function ensureCubeVisible() {
+    // キューブが表示状態でなければ状態を更新
     if (!isCubeVisible) {
       isCubeVisible = true;
-  
-      // アイコンの更新
+      
+      // UIのアイコン更新
       const icon = toggleCubeBtn.querySelector('i');
-      icon.classList.remove('fa-cube');
-      icon.classList.add('fa-eye-slash');
+      if (icon) {
+        icon.classList.remove('fa-cube');
+        icon.classList.add('fa-eye-slash');
+      }
     }
-  
-    // キューブの表示を強制的に有効化
-    arObject.setAttribute('visible', true);
-  
-    // キューブの位置とスケールをリセット
+    
+    // A-Frameのキューブ要素
+    const cube = document.getElementById('arObject');
+    if (!cube) {
+      console.error("キューブ要素が見つかりません");
+      return;
+    }
+    
+    // キューブの表示を複数の方法で強制
+    cube.setAttribute('visible', true);
+    cube.object3D.visible = true; // Three.js オブジェクト直接操作
+    
+    // 明示的にスタイルを設定
+    cube.style.visibility = 'visible';
+    cube.style.display = 'block';
+    cube.style.opacity = '1';
+    
+    // キューブの位置をリセット（念のため）
     resetObjectPosition();
-  
-    // DOMスタイルでも強制的に表示
-    arObject.style.visibility = 'visible';
-    arObject.style.display = 'block';
-  
+    
+    // Safari用の特別な修正
+    if (isSafari()) {
+      forceShowCube();
+    }
+    
     console.log("キューブの表示を強制的に有効化しました");
-  }
-
+}
+  
 // 画面の中央座標を取得する関数
 function getScreenCenter() {
   // 画面サイズに基づく調整（視覚的な中央に配置するため）
@@ -887,21 +928,6 @@ function isSafari() {
     return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   }
   
-  // Safari対応のA-Frameサイズ調整
-  function adjustSceneForSafari() {
-    if (isSafari()) {
-      console.log("Safari環境のため、A-Frameシーンを調整します");
-      const aframeCanvas = document.querySelector('canvas.a-canvas');
-      if (aframeCanvas) {
-        aframeCanvas.style.position = 'absolute';
-        aframeCanvas.style.top = '0';
-        aframeCanvas.style.left = '0';
-        aframeCanvas.style.width = '100%';
-        aframeCanvas.style.height = '100%';
-      }
-    }
-  }
-  
   // DOMロード後の初期化
   document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMがロードされました - Safari対応とキューブ監視を初期化");
@@ -909,3 +935,83 @@ function isSafari() {
     adjustSceneForSafari(); // Safari対応のサイズ調整
     startCubeVisibilityCheck(); // キューブ表示監視を開始
   });
+
+  // Safari特有の問題に対応するための追加関数
+function fixSafariARDisplay() {
+    if (isSafari()) {
+      console.log("Safari環境を検出 - 特別な表示修正を適用");
+      
+      // Safariでのスケーリング問題を修正
+      document.querySelector('meta[name="viewport"]').setAttribute(
+        'content', 
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+      );
+      
+      // A-Frameのキャンバス要素に直接スタイルを適用
+      const canvas = document.querySelector('canvas.a-canvas');
+      if (canvas) {
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.zIndex = '3';
+        canvas.style.objectFit = 'cover';
+      }
+      
+      // キューブ要素のスタイルを強制
+      const cube = document.getElementById('arObject');
+      if (cube) {
+        // DOMスタイルプロパティを直接適用
+        cube.style.visibility = 'visible';
+        cube.style.display = 'block';
+      }
+    }
+}
+  
+// キューブ表示の根本的な問題を修正する強化関数
+function forceShowCube() {
+    const cube = document.getElementById('arObject');
+    if (!cube) return;
+    
+    // A-Frameのエンティティ属性を直接操作
+    cube.setAttribute('visible', 'true');
+    
+    // イベント発火を明示的に行う
+    setTimeout(() => {
+      // キューブの位置と回転を明示的に設定
+      cube.setAttribute('position', '0 1 -3');
+      cube.setAttribute('rotation', '0 45 0');
+      cube.setAttribute('scale', '0.5 0.5 0.5');
+      
+      // マテリアルを再設定
+      const currentColor = cube.getAttribute('material').color || '#2196F3';
+      cube.setAttribute('material', {
+        color: currentColor,
+        metalness: 0.2,
+        roughness: 0.8
+      });
+      
+      console.log("キューブ表示を強制的に修復しました");
+    }, 100);
+}
+  
+// モバイルデバイス用の最適化関数
+function optimizeForMobile() {
+    // モバイルデバイスかどうかを検出
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.log("モバイルデバイスを検出 - 最適化を適用");
+      
+      // パフォーマンス向上のための調整
+      if (aframeScene) {
+        // レンダラー設定の最適化
+        aframeScene.setAttribute('renderer', {
+          antialias: false,  // モバイルではアンチエイリアスを無効化
+          precision: 'mediump', // 中程度の精度で十分
+          physicallyCorrectLights: false // 物理ベースライティングを無効化
+        });
+      }
+    }
+}
